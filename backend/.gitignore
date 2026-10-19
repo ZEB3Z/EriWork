@@ -1,0 +1,13 @@
+node_modules
+config/.env
+*.log
+npm-debug.log*
+
+# Locally-uploaded images (keep the folders, ignore their contents)
+uploads/products/*
+!uploads/products/.gitkeep
+!uploads/products/placeholder.png
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+!uploads/avatars/placeholder.png
+!uploads/products/seed/
