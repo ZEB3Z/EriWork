@@ -179,8 +179,8 @@ This project was developed as a requirement for the course **Integrative Program
 
 | Author | GitHub |
 |---|---|
-| **Vincent Andri V. Barliso** | [@vincent-github-username](https://github.com/Vizsaa) |
-| **Ericksson B. Brutas** | [@ericksson-github-username](https://github.com/ZEB3Z) |
+| **Vincent Andri V. Barliso** | [Vizsaa](https://github.com/Vizsaa) |
+| **Ericksson B. Brutas** | [ZEB3Z](https://github.com/ZEB3Z) |
 
 ---
 
