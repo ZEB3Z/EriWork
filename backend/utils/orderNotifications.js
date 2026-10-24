@@ -2,7 +2,7 @@ const sendEmail = require('./sendEmail');
 const buildOrderEmail = require('./orderEmail');
 const generateReceiptPdf = require('./receiptPdf');
 
-const emailConfigured = () => Boolean(process.env.SMTP_HOST && process.env.SMTP_EMAIL);
+const emailConfigured = () => Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
 // Emails the customer an order summary with the PDF receipt attached.
 // type: 'placed' or 'status'. Never throws — email problems must not break orders.

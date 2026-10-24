@@ -1,22 +1,26 @@
 const nodemailer = require('nodemailer');
 
-// Sends an email using the SMTP settings in config/.env (e.g. Mailtrap).
+// Sends an email with Nodemailer over SMTP. The SMTP_* settings point at a
+// Mailtrap sandbox inbox (see backend/.env.example): emails are caught there
+// for testing and never reach real inboxes. Swap in a production SMTP
+// provider's host/port/user/pass to deliver to real customers.
 // options: { email, subject, message, html?, attachments? }
 const sendEmail = async (options) => {
-    const port = Number(process.env.SMTP_PORT) || 587;
+    const port = Number(process.env.SMTP_PORT) || 2525;
 
     const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port,
-        secure: port === 465, // 465 = SSL, 587/2525 = STARTTLS
+        secure: port === 465, // 465 = SSL, 2525/587 = STARTTLS
         auth: {
-            user: process.env.SMTP_EMAIL,
-            pass: process.env.SMTP_PASSWORD
-        }
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        },
+        connectionTimeout: 15000
     });
 
     const info = await transporter.sendMail({
-        from: `${process.env.SMTP_FROM_NAME || 'EriWork'} <${process.env.SMTP_FROM_EMAIL || 'noreply@eriwork.local'}>`,
+        from: process.env.SMTP_FROM || 'EriWork <noreply@eriwork.local>',
         to: options.email,
         subject: options.subject,
         text: options.message,

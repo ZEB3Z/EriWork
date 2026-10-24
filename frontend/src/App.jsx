@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { useDispatch } from 'react-redux'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
+import { loadUser } from './redux/actions/authActions'
 
 import Header from './Components/Layout/Header'
 import Footer from './Components/Layout/Footer'
@@ -34,65 +36,30 @@ import UsersList from './Components/Admin/UsersList'
 import UpdateUser from './Components/Admin/UpdateUser'
 import ProductReviews from './Components/Admin/ProductReviews'
 
-const loadSaved = (key, fallback) => {
-    try {
-        const saved = localStorage.getItem(key)
-        return saved ? JSON.parse(saved) : fallback
-    } catch {
-        return fallback
-    }
-}
-
+// Auth, cart and the product list live in the Redux store (src/redux).
 export default function App() {
-    const [cartItems, setCartItems] = useState(() => loadSaved('cartItems', []))
-    const [shippingInfo, setShippingInfo] = useState(() => loadSaved('shippingInfo', {}))
+    const dispatch = useDispatch()
 
-    // Keep the cart and shipping address after a page refresh.
-    useEffect(() => { localStorage.setItem('cartItems', JSON.stringify(cartItems)) }, [cartItems])
-    useEffect(() => { localStorage.setItem('shippingInfo', JSON.stringify(shippingInfo)) }, [shippingInfo])
+    // Restore the login session from the httpOnly cookie when the app starts.
+    useEffect(() => { dispatch(loadUser()) }, [dispatch])
 
-    // Add a product, or increase its quantity if it's already in the cart (never above stock).
-    const addItemToCart = (product, quantity) => {
-        setCartItems((items) => {
-            const existing = items.find((i) => i.product === product._id)
-            if (existing) {
-                return items.map((i) => i.product === product._id
-                    ? { ...i, quantity: Math.min(i.quantity + quantity, product.stock), stock: product.stock, price: product.price }
-                    : i)
-            }
-            return [...items, {
-                product: product._id,
-                name: product.name,
-                price: product.price,
-                image: product.images[0] ? product.images[0].url : '',
-                stock: product.stock,
-                quantity: Math.min(quantity, product.stock)
-            }]
-        })
-    }
-    const updateQuantity = (id, quantity) =>
-        setCartItems((items) => items.map((i) => (i.product === id ? { ...i, quantity } : i)))
-    const removeItem = (id) => setCartItems((items) => items.filter((i) => i.product !== id))
-    const clearCart = () => setCartItems([])
-
-    const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0)
     const signedIn = (page) => <ProtectedRoute>{page}</ProtectedRoute>
 
     return (
         <BrowserRouter>
-            <Header cartCount={cartCount} />
+            <Header />
             <main style={{ flex: 1 }}>
                 <Routes>
                     {/* Shop */}
                     <Route path="/" element={<Home />} />
                     <Route path="/search/:keyword" element={<Home />} />
-                    <Route path="/product/:id" element={<ProductDetails addItemToCart={addItemToCart} />} />
-                    <Route path="/cart" element={<Cart cartItems={cartItems} updateQuantity={updateQuantity} removeItem={removeItem} />} />
+                    <Route path="/product/:id" element={<ProductDetails />} />
+                    <Route path="/cart" element={<Cart />} />
 
                     {/* Checkout */}
-                    <Route path="/shipping" element={signedIn(<Shipping cartItems={cartItems} shippingInfo={shippingInfo} saveShippingInfo={setShippingInfo} />)} />
-                    <Route path="/confirm" element={signedIn(<ConfirmOrder cartItems={cartItems} shippingInfo={shippingInfo} />)} />
-                    <Route path="/payment" element={signedIn(<Payment cartItems={cartItems} shippingInfo={shippingInfo} clearCart={clearCart} />)} />
+                    <Route path="/shipping" element={signedIn(<Shipping />)} />
+                    <Route path="/confirm" element={signedIn(<ConfirmOrder />)} />
+                    <Route path="/payment" element={signedIn(<Payment />)} />
                     <Route path="/success" element={signedIn(<OrderSuccess />)} />
                     <Route path="/orders/me" element={signedIn(<ListOrders />)} />
                     <Route path="/order/:id" element={signedIn(<OrderDetails />)} />

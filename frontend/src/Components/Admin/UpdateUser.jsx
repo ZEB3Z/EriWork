@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { toast } from 'react-toastify'
@@ -9,7 +10,6 @@ import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import Box from '@mui/material/Box'
 import api, { getErrorMessage } from '../../api'
-import { getUser } from '../../Utils/helpers'
 import { userSchema } from '../../Utils/validation'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
@@ -19,7 +19,7 @@ import FormField from '../Common/FormField'
 export default function UpdateUser() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const isMe = getUser()._id === id
+    const isMe = useSelector((state) => state.auth.user._id) === id
     const [loading, setLoading] = useState(true)
 
     const { control, handleSubmit, reset, formState: { isSubmitting } } = useForm({
@@ -48,7 +48,7 @@ export default function UpdateUser() {
 
     return (
         <>
-            <MetaData title="Edit user" />
+            <MetaData title="Edit user" noIndex />
             <PageHeader title="Edit user" />
             <Paper variant="outlined" sx={{ p: 3, maxWidth: 520 }}>
                 <Stack component="form" spacing={2} onSubmit={handleSubmit(onSubmit)} noValidate>

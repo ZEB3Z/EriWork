@@ -1,54 +1,60 @@
 // One-time setup script for EriWork. Run from the backend/ folder:
-//   node seeds/seed.js
+//   npm run seed
 //
+// Needs MONGO_URI and the CLOUDINARY_* keys in backend/.env.
 // Creates (only if missing, so it's safe to run again):
 //   - an admin account          admin@eriwork.local    / admin1234
 //   - two demo customers        juan@eriwork.local     / customer1234
 //                               maria@eriwork.local    / customer1234
-//   - a catalog of networking products with photos
+//   - a catalog of networking products; their photos (seeds/images/*.svg)
+//     are uploaded to Cloudinary under eriwork/products/seed
 //   - demo orders over the last 60 days (for the sales chart) and reviews
 //
-// To start completely fresh, delete the database in MongoDB Compass first.
+// To start completely fresh, drop the "eriwork" database in MongoDB Atlas
+// (Browse Collections > eriwork > Drop database) first.
 
 const path = require('path')
 const mongoose = require('mongoose')
-require('dotenv').config({ path: path.join(__dirname, '..', 'config', '.env') })
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true })
 
 const Product = require('../models/product')
 const Order = require('../models/order')
 const User = require('../models/user')
+const { DEFAULT_AVATAR } = require('../models/user')
 const { calculatePrices } = require('../utils/pricing')
 const { cleanText } = require('../utils/badWords')
+const { uploadPath, isCloudinaryConfigured } = require('../config/cloudinary')
 
-const img = (name) => [
-    { public_id: `products/seed/${name}-a`, url: `/uploads/products/seed/${name}-a.svg` },
-    { public_id: `products/seed/${name}-b`, url: `/uploads/products/seed/${name}-b.svg` }
-]
+const IMAGES_DIR = path.join(__dirname, 'images')
+
+// Upload both demo photos of a product to Cloudinary (overwriting on re-runs).
+const img = async (name) => Promise.all(['a', 'b'].map((v) =>
+    uploadPath(path.join(IMAGES_DIR, `${name}-${v}.svg`), `${name}-${v}`)))
 
 const PRODUCTS = [
-    { name: 'EriWork AX3000 Dual-Band WiFi 6 Router', price: 89.99, category: 'Routers', stock: 40, images: img('router'),
+    { name: 'EriWork AX3000 Dual-Band WiFi 6 Router', price: 89.99, category: 'Routers', stock: 40, imageName: 'router',
       description: 'Wi-Fi 6 router with speeds up to 3000 Mbps, four high-gain antennas, OFDMA and MU-MIMO for low-latency connections across many devices. Four Gigabit LAN ports and one Gigabit WAN port.' },
-    { name: 'EriWork AX5400 Tri-Band Gaming Router', price: 169.99, category: 'Routers', stock: 25, images: img('gaming-router'),
+    { name: 'EriWork AX5400 Tri-Band Gaming Router', price: 169.99, category: 'Routers', stock: 25, imageName: 'gaming-router',
       description: 'Tri-band Wi-Fi 6 gaming router with a 1.7 GHz quad-core CPU, a dedicated gaming port, traffic prioritisation and 2.5G WAN. Built for low ping under heavy load.' },
-    { name: 'EriWork Deco Mesh WiFi System (3-Pack)', price: 199.99, category: 'Mesh WiFi', stock: 30, images: img('mesh'),
+    { name: 'EriWork Deco Mesh WiFi System (3-Pack)', price: 199.99, category: 'Mesh WiFi', stock: 30, imageName: 'mesh',
       description: 'Whole-home mesh Wi-Fi covering up to 5,500 sq ft with seamless roaming on one network name. Self-healing mesh, parental controls and app setup in minutes.' },
-    { name: 'EriWork AC1200 WiFi Range Extender', price: 34.99, category: 'Range Extenders', stock: 60, images: img('extender'),
+    { name: 'EriWork AC1200 WiFi Range Extender', price: 34.99, category: 'Range Extenders', stock: 60, imageName: 'extender',
       description: 'Dual-band extender that boosts existing Wi-Fi coverage by up to 1,500 sq ft. One-touch setup, a signal indicator for the best placement and a Gigabit Ethernet port.' },
-    { name: 'EriWork Ceiling Mount WiFi 6 Access Point', price: 79.99, category: 'Access Points', stock: 35, images: img('access-point'),
+    { name: 'EriWork Ceiling Mount WiFi 6 Access Point', price: 79.99, category: 'Access Points', stock: 35, imageName: 'access-point',
       description: 'Business-grade Wi-Fi 6 access point with PoE power, seamless roaming and cloud management. Ideal for offices, cafes and classrooms.' },
-    { name: 'EriWork 8-Port Gigabit Desktop Switch', price: 24.99, category: 'Switches', stock: 80, images: img('switch-8'),
+    { name: 'EriWork 8-Port Gigabit Desktop Switch', price: 24.99, category: 'Switches', stock: 80, imageName: 'switch-8',
       description: 'Unmanaged 8-port Gigabit switch in a fanless metal case. Plug-and-play setup with auto-negotiation on every port.' },
-    { name: 'EriWork 16-Port Gigabit Smart Switch', price: 109.99, category: 'Switches', stock: 20, images: img('switch-16'),
+    { name: 'EriWork 16-Port Gigabit Smart Switch', price: 109.99, category: 'Switches', stock: 20, imageName: 'switch-16',
       description: 'Smart managed 16-port Gigabit switch with VLAN, QoS and link aggregation in a 1U rack-mount chassis. Web-managed for growing networks.' },
-    { name: 'EriWork USB 3.0 Gigabit Ethernet Adapter', price: 15.99, category: 'Network Adapters', stock: 100, images: img('usb-adapter'),
+    { name: 'EriWork USB 3.0 Gigabit Ethernet Adapter', price: 15.99, category: 'Network Adapters', stock: 100, imageName: 'usb-adapter',
       description: 'Adds a Gigabit wired port to any laptop over USB 3.0. Plug-and-play on Windows, macOS and Linux.' },
-    { name: 'EriWork AV1000 Powerline Adapter Kit', price: 44.99, category: 'Powerline', stock: 45, images: img('powerline'),
+    { name: 'EriWork AV1000 Powerline Adapter Kit', price: 44.99, category: 'Powerline', stock: 45, imageName: 'powerline',
       description: 'Extends your network through existing electrical wiring at up to 1000 Mbps — no new cables needed. Plug-and-play pair with Gigabit ports.' },
-    { name: 'EriWork Cat6 Ethernet Cable 3m (5-Pack)', price: 12.99, category: 'Cables', stock: 150, images: img('cable-cat6'),
+    { name: 'EriWork Cat6 Ethernet Cable 3m (5-Pack)', price: 12.99, category: 'Cables', stock: 150, imageName: 'cable-cat6',
       description: 'Cat6 patch cables rated for Gigabit speeds and 250 MHz bandwidth, with snagless boots and pure copper conductors. Pack of five.' },
-    { name: 'EriWork Cat7 Shielded Ethernet Cable 10m', price: 18.99, category: 'Cables', stock: 90, images: img('cable-cat7'),
+    { name: 'EriWork Cat7 Shielded Ethernet Cable 10m', price: 18.99, category: 'Cables', stock: 90, imageName: 'cable-cat7',
       description: 'Shielded S/FTP Cat7 cable supporting 10 Gbps for interference-free high-speed runs. Durable braided jacket and gold-plated connectors.' },
-    { name: 'EriWork 24-Port Cat6 Patch Panel', price: 29.99, category: 'Accessories', stock: 0, images: img('patch-panel'),
+    { name: 'EriWork 24-Port Cat6 Patch Panel', price: 29.99, category: 'Accessories', stock: 0, imageName: 'patch-panel',
       description: '24-port Cat6 patch panel for tidy structured cabling. Colour-coded T568A/B wiring and wall or rack mounting.' }
 ]
 
@@ -82,16 +88,14 @@ async function ensureUser(data) {
         console.log(`User ${data.email} already exists, skipping.`)
         return existing
     }
-    const user = await User.create({
-        ...data,
-        avatar: { public_id: 'avatars/placeholder', url: '/uploads/avatars/placeholder.png' }
-    })
+    const user = await User.create({ ...data, avatar: DEFAULT_AVATAR })
     console.log(`Created ${data.role || 'user'}: ${data.email} / ${data.password}`)
     return user
 }
 
 async function run() {
-    await mongoose.connect(process.env.DB_URI)
+    if (!process.env.MONGO_URI) throw new Error('MONGO_URI is missing — add it to backend/.env')
+    await mongoose.connect(process.env.MONGO_URI)
     console.log('Connected to MongoDB for seeding...\n')
 
     // ---- Users ----
@@ -106,12 +110,17 @@ async function run() {
     if (products.length > 0) {
         console.log(`\nProducts already exist (${products.length}), skipping catalog.`)
     } else {
-        console.log('')
+        if (!isCloudinaryConfigured()) {
+            throw new Error('Cloudinary keys are missing — add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to backend/.env')
+        }
+        console.log('\nUploading product photos to Cloudinary...')
         const now = Date.now()
         for (let i = 0; i < PRODUCTS.length; i++) {
+            const { imageName, ...data } = PRODUCTS[i]
+            const images = await img(imageName)
             // Spread createdAt so "newest first" ordering is stable.
-            await Product.create({ ...PRODUCTS[i], seller: 'EriWork', user: admin._id, createdAt: new Date(now - i * 60000) })
-            console.log(`Created product "${PRODUCTS[i].name}"`)
+            await Product.create({ ...data, images, seller: 'EriWork', user: admin._id, createdAt: new Date(now - i * 60000) })
+            console.log(`Created product "${data.name}"`)
         }
         products = await Product.find().sort({ createdAt: -1 })
     }
@@ -190,7 +199,8 @@ async function run() {
     process.exit(0)
 }
 
-run().catch((err) => {
+run().catch(async (err) => {
     console.error('Seeding failed:', err.message)
+    await mongoose.disconnect().catch(() => {})
     process.exit(1)
 })

@@ -5,21 +5,26 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import AddPhotoAlternateOutlined from '@mui/icons-material/AddPhotoAlternateOutlined'
 import CloseRounded from '@mui/icons-material/CloseRounded'
-import { resolveImageUrl, readFileAsDataUrl, checkImageFile, MAX_IMAGE_MB } from '../../Utils/helpers'
+import { resolveImageUrl, checkImageFile, toUpload, releaseUpload, MAX_IMAGE_MB } from '../../Utils/helpers'
 
 // Multi-photo picker with previews.
-// existing: photos already saved on the server  [{ public_id, url }]
-// added:    new photos as base64 data URIs      [string]
+// existing: photos already saved on Cloudinary  [{ public_id, url }]
+// added:    new photos picked in the browser    [{ file, preview }]
+//           (the Files are uploaded as multipart/form-data when the form is saved)
 export default function ImageUploader({ existing = [], onExistingChange, added, onAddedChange, error }) {
     const [fileError, setFileError] = useState('')
 
-    const handleFiles = async (e) => {
+    const handleFiles = (e) => {
         const files = Array.from(e.target.files || [])
         e.target.value = '' // allow picking the same file again
         setFileError(files.map(checkImageFile).filter(Boolean).join(' · '))
         const valid = files.filter((f) => !checkImageFile(f))
-        const dataUrls = await Promise.all(valid.map(readFileAsDataUrl))
-        onAddedChange([...added, ...dataUrls])
+        onAddedChange([...added, ...valid.map(toUpload)])
+    }
+
+    const removeAdded = (index) => {
+        releaseUpload(added[index])
+        onAddedChange(added.filter((_, i) => i !== index))
     }
 
     const tile = (src, onRemove, key, label) => (
@@ -41,8 +46,8 @@ export default function ImageUploader({ existing = [], onExistingChange, added, 
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
                 {existing.map((img, i) =>
                     tile(resolveImageUrl(img.url), () => onExistingChange(existing.filter((x) => x.public_id !== img.public_id)), img.public_id, `photo ${i + 1}`))}
-                {added.map((src, i) =>
-                    tile(src, () => onAddedChange(added.filter((_, idx) => idx !== i)), `new-${i}`, `new photo ${i + 1}`))}
+                {added.map((upload, i) =>
+                    tile(upload.preview, () => removeAdded(i), upload.preview, `new photo ${i + 1}`))}
                 <Button
                     component="label"
                     variant="outlined"

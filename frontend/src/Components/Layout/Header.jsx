@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import AppBar from '@mui/material/AppBar'
@@ -23,7 +24,8 @@ import DashboardOutlined from '@mui/icons-material/DashboardOutlined'
 import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined'
 import PersonOutlined from '@mui/icons-material/PersonOutlined'
 import LogoutRounded from '@mui/icons-material/LogoutRounded'
-import { getUser, logout, AUTH_EVENT, avatarSrc } from '../../Utils/helpers'
+import { avatarSrc } from '../../Utils/helpers'
+import { logout } from '../../redux/actions/authActions'
 
 // Search field. It is re-created on every page change (key={pathname}),
 // so it always starts with the keyword from the URL, if any.
@@ -55,25 +57,19 @@ function SearchBox({ pathname }) {
     )
 }
 
-export default function Header({ cartCount }) {
-    const [user, setUser] = useState(getUser())
+export default function Header() {
+    const user = useSelector((state) => state.auth.user)
+    const cartCount = useSelector((state) => state.cart.cartItems.reduce((sum, i) => sum + i.quantity, 0))
+    const dispatch = useDispatch()
     const [menuAnchor, setMenuAnchor] = useState(null)
     const navigate = useNavigate()
     const location = useLocation()
 
-    // Re-read the logged-in user whenever someone logs in or out.
-    useEffect(() => {
-        const sync = () => setUser(getUser())
-        window.addEventListener(AUTH_EVENT, sync)
-        return () => window.removeEventListener(AUTH_EVENT, sync)
-    }, [])
-
-    const handleLogout = () => {
+    const handleLogout = async () => {
         setMenuAnchor(null)
-        logout(() => {
-            toast.success('You are logged out')
-            navigate('/')
-        })
+        await dispatch(logout())
+        toast.success('You are logged out')
+        navigate('/')
     }
 
     const go = (path) => {

@@ -31,7 +31,7 @@ export default function ForgotPassword() {
 
     return (
         <AuthCard title="Forgot password" subtitle="We'll email you a link to reset it.">
-            <MetaData title="Forgot password" />
+            <MetaData title="Forgot password" noIndex />
             {sentTo ? (
                 <Alert severity="success">Check <b>{sentTo}</b> for a reset link. It's valid for 30 minutes.</Alert>
             ) : (

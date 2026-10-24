@@ -1,51 +1,28 @@
 // ---------------------------------------------------------------------------
-// Login session (stored in sessionStorage)
+// Session token (Bearer fallback)
 // ---------------------------------------------------------------------------
+// The real session is the httpOnly cookie the API sets, and the logged-in user
+// lives in Redux (src/redux). The token is also kept here for this browser tab
+// only, so browsers that block cross-site cookies (e.g. Safari) still work.
 
-// Fired on login/logout so the header updates immediately.
-export const AUTH_EVENT = 'eriwork-auth-changed'
-const notify = () => window.dispatchEvent(new Event(AUTH_EVENT))
-
-export const authenticate = (data, next) => {
-    sessionStorage.setItem('token', JSON.stringify(data.token))
-    sessionStorage.setItem('user', JSON.stringify(data.user))
-    notify()
-    if (typeof next === 'function') next()
+export const setToken = (token) => {
+    if (token) sessionStorage.setItem('token', token)
 }
 
-// Update the saved user (e.g. after editing the profile) but keep the token.
-export const updateStoredUser = (user) => {
-    sessionStorage.setItem('user', JSON.stringify(user))
-    notify()
-}
+export const getToken = () => sessionStorage.getItem('token') || null
 
-export const getUser = () => {
-    const user = sessionStorage.getItem('user')
-    return user ? JSON.parse(user) : false
-}
-
-export const getToken = () => {
-    const token = sessionStorage.getItem('token')
-    return token ? JSON.parse(token) : false
-}
-
-export const logout = (next) => {
-    sessionStorage.removeItem('token')
-    sessionStorage.removeItem('user')
-    notify()
-    if (typeof next === 'function') next()
-}
+export const clearToken = () => sessionStorage.removeItem('token')
 
 // ---------------------------------------------------------------------------
 // Formatting
 // ---------------------------------------------------------------------------
 
-// Uploaded files are stored as "/uploads/..." on the backend server.
+// Images are hosted on Cloudinary, so they are full https:// URLs. Local
+// previews use blob: URLs. Anything else (e.g. the "placeholder" avatar) has no image.
 export const resolveImageUrl = (url) => {
     if (!url) return ''
-    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url
-    const origin = (import.meta.env.VITE_API || '').replace(/\/api\/v1\/?$/, '')
-    return `${origin}${url}`
+    if (/^https?:\/\//i.test(url) || url.startsWith('blob:') || url.startsWith('data:')) return url
+    return ''
 }
 
 export const formatMoney = (n) =>
@@ -80,14 +57,10 @@ export const calculatePrices = (items) => {
 export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 export const MAX_IMAGE_MB = 5
 
-// Read a File into a base64 data URI (what the backend expects).
-export const readFileAsDataUrl = (file) =>
-    new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-    })
+// A picked file plus a local preview URL. The File itself is sent to the API as
+// multipart/form-data (Multer on the server, then Cloudinary).
+export const toUpload = (file) => ({ file, preview: URL.createObjectURL(file) })
+export const releaseUpload = (upload) => upload && URL.revokeObjectURL(upload.preview)
 
 // Returns an error message, or null if the file is fine.
 export const checkImageFile = (file) => {

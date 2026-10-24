@@ -1,16 +1,18 @@
-# React + Vite
+# EriWork — website (React 19 + Vite 8)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This folder is the EriWork storefront and admin dashboard. It is deployed to
+Render as a **Static Site**.
 
-Currently, two official plugins are available:
+Setup, environment variables and deployment are covered in the main
+[README](../README.md). The short version:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+cp .env.example .env    # set VITE_API_URL (and Firebase keys if you use social login)
+npm install
+npm run dev             # http://localhost:5173
+npm run build           # production build in dist/
+npm run lint            # ESLint
+```
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+State lives in Redux (`src/redux`), API calls go through `src/api.js`, and
+`VITE_*` variables are baked in at build time — rebuild after changing them.

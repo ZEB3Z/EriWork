@@ -16,7 +16,7 @@ import api, { getErrorMessage } from '../../api'
 import { formatDate } from '../../Utils/helpers'
 import MetaData from '../Layout/MetaData'
 import PageHeader from '../Common/PageHeader'
-import ConfirmDialog from '../Common/ConfirmDialog'
+import { confirmDelete } from '../../Utils/alerts'
 
 export default function ProductReviews() {
     const [reviews, setReviews] = useState([])
@@ -24,8 +24,6 @@ export default function ProductReviews() {
     const [product, setProduct] = useState('all')
     const [stars, setStars] = useState('all')
     const [search, setSearch] = useState('')
-    const [toDelete, setToDelete] = useState(null)
-    const [deleting, setDeleting] = useState(false)
 
     // Bump "refresh" to load the list again (e.g. after deleting).
     const [refresh, setRefresh] = useState(0)
@@ -49,17 +47,16 @@ export default function ProductReviews() {
         (!search || `${r.name} ${r.comment}`.toLowerCase().includes(search.toLowerCase()))
     )
 
-    const confirmDelete = async () => {
-        setDeleting(true)
-        try {
-            await api.delete('/admin/reviews', { params: { productId: toDelete.productId, id: toDelete._id } })
+    const askDelete = async (review) => {
+        const deleted = await confirmDelete({
+            title: 'Delete review?',
+            text: `Remove ${review.name}'s ${review.rating}-star review of "${review.productName}"? The product rating will be recalculated.`,
+            action: () => api.delete('/admin/reviews', { params: { productId: review.productId, id: review._id } })
+        })
+        if (deleted) {
             toast.success('Review deleted')
-            setToDelete(null)
             loadReviews()
-        } catch (err) {
-            toast.error(getErrorMessage(err))
         }
-        setDeleting(false)
     }
 
     const columns = [
@@ -70,7 +67,7 @@ export default function ProductReviews() {
         { field: 'createdAt', headerName: 'Date', width: 120, type: 'date', valueGetter: (value) => new Date(value), valueFormatter: (value) => formatDate(value) },
         {
             field: 'actions', headerName: '', width: 70, sortable: false, filterable: false,
-            renderCell: ({ row }) => <Tooltip title="Delete review"><IconButton size="small" color="error" onClick={() => setToDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
+            renderCell: ({ row }) => <Tooltip title="Delete review"><IconButton size="small" color="error" onClick={() => askDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
         }
     ]
 
@@ -78,7 +75,7 @@ export default function ProductReviews() {
 
     return (
         <>
-            <MetaData title="Reviews" />
+            <MetaData title="Reviews" noIndex />
             <PageHeader title="Reviews" subtitle={`${reviews.length} reviews across all products`} />
             <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
                 <TextField select label="Product" value={product} onChange={(e) => setProduct(e.target.value)} sx={{ minWidth: 240 }}>
@@ -108,14 +105,6 @@ export default function ProductReviews() {
                 />
             </Paper>
             <Box sx={{ height: 8 }} />
-            <ConfirmDialog
-                open={Boolean(toDelete)}
-                title="Delete review?"
-                message={toDelete ? `Remove ${toDelete.name}'s ${toDelete.rating}-star review of "${toDelete.productName}"? The product rating will be recalculated.` : ''}
-                loading={deleting}
-                onConfirm={confirmDelete}
-                onClose={() => setToDelete(null)}
-            />
         </>
     )
 }

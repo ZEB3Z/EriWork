@@ -1,4 +1,5 @@
 import { Navigate, useNavigate, Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
 import Paper from '@mui/material/Paper'
@@ -9,11 +10,12 @@ import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
 import OrderItems from '../Order/OrderItems'
 import PriceSummary from '../Order/PriceSummary'
-import { calculatePrices, getUser } from '../../Utils/helpers'
+import { calculatePrices } from '../../Utils/helpers'
 
-export default function ConfirmOrder({ cartItems, shippingInfo }) {
+export default function ConfirmOrder() {
     const navigate = useNavigate()
-    const user = getUser()
+    const { cartItems, shippingInfo } = useSelector((state) => state.cart)
+    const user = useSelector((state) => state.auth.user)
 
     if (cartItems.length === 0) return <Navigate to="/cart" replace />
     if (!shippingInfo.address) return <Navigate to="/shipping" replace />
@@ -22,7 +24,7 @@ export default function ConfirmOrder({ cartItems, shippingInfo }) {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title="Confirm order" />
+            <MetaData title="Confirm order" noIndex />
             <CheckoutSteps activeStep={1} />
             <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 8 }}>

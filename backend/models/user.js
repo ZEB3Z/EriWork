@@ -52,7 +52,7 @@ userSchema.pre('save', async function () {
 
 userSchema.methods.getJwtToken = function () {
     return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_TIME
+        expiresIn: process.env.JWT_EXPIRE || '7d'
     });
 }
 
@@ -75,3 +75,8 @@ userSchema.methods.getResetPasswordToken = function () {
 }
 
 module.exports = mongoose.model('User', userSchema);
+
+// Avatar used until the user uploads a photo. It is not a real image: the
+// frontend shows the user's initial instead (see avatarSrc in helpers.jsx),
+// and its public_id is outside the Cloudinary folder, so it's never deleted.
+module.exports.DEFAULT_AVATAR = { public_id: 'placeholder', url: 'placeholder' };

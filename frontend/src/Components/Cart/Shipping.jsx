@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { countries } from 'countries-list'
@@ -12,11 +13,14 @@ import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
 import FormField from '../Common/FormField'
 import { shippingSchema } from '../../Utils/validation'
+import { saveShippingInfo } from '../../redux/actions/cartActions'
 
 const COUNTRY_NAMES = Object.values(countries).map((c) => c.name).sort()
 
-export default function Shipping({ cartItems, shippingInfo, saveShippingInfo }) {
+export default function Shipping() {
     const navigate = useNavigate()
+    const dispatch = useDispatch()
+    const { cartItems, shippingInfo } = useSelector((state) => state.cart)
     const { control, handleSubmit } = useForm({
         resolver: yupResolver(shippingSchema),
         defaultValues: { address: '', city: '', postalCode: '', phoneNo: '', country: 'Philippines', ...shippingInfo }
@@ -25,13 +29,13 @@ export default function Shipping({ cartItems, shippingInfo, saveShippingInfo }) 
     if (cartItems.length === 0) return <Navigate to="/cart" replace />
 
     const onSubmit = (values) => {
-        saveShippingInfo(values)
+        dispatch(saveShippingInfo(values))
         navigate('/confirm')
     }
 
     return (
         <Container maxWidth="sm" sx={{ py: 4 }}>
-            <MetaData title="Shipping" />
+            <MetaData title="Shipping" noIndex />
             <CheckoutSteps activeStep={0} />
             <Paper variant="outlined" component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ p: { xs: 2.5, sm: 4 } }}>
                 <Typography variant="h2" sx={{ mb: 3 }}>Where should we ship it?</Typography>

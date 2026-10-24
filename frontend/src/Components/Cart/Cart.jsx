@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
 import Paper from '@mui/material/Paper'
@@ -15,19 +16,25 @@ import ShoppingCartOutlined from '@mui/icons-material/ShoppingCartOutlined'
 import MetaData from '../Layout/MetaData'
 import EmptyState from '../Common/EmptyState'
 import PriceSummary from '../Order/PriceSummary'
-import { resolveImageUrl, formatMoney, calculatePrices, getUser, FREE_SHIPPING_THRESHOLD } from '../../Utils/helpers'
+import { resolveImageUrl, formatMoney, calculatePrices, FREE_SHIPPING_THRESHOLD } from '../../Utils/helpers'
+import { updateQuantity as updateQuantityAction, removeItem as removeItemAction } from '../../redux/actions/cartActions'
 
-export default function Cart({ cartItems, updateQuantity, removeItem }) {
+export default function Cart() {
     const navigate = useNavigate()
+    const dispatch = useDispatch()
+    const cartItems = useSelector((state) => state.cart.cartItems)
+    const user = useSelector((state) => state.auth.user)
+    const updateQuantity = (id, quantity) => dispatch(updateQuantityAction(id, quantity))
+    const removeItem = (id) => dispatch(removeItemAction(id))
     const prices = calculatePrices(cartItems)
     const units = cartItems.reduce((sum, i) => sum + i.quantity, 0)
 
-    const checkout = () => navigate(getUser() ? '/shipping' : '/login?redirect=shipping')
+    const checkout = () => navigate(user ? '/shipping' : '/login?redirect=shipping')
 
     if (cartItems.length === 0) {
         return (
             <Container maxWidth="md">
-                <MetaData title="Your cart" />
+                <MetaData title="Your cart" noIndex />
                 <EmptyState icon={<ShoppingCartOutlined />} title="Your cart is empty"
                     message="Find routers, mesh WiFi and more in the shop."
                     action={<Button component={Link} to="/" variant="contained">Start shopping</Button>} />
@@ -37,7 +44,7 @@ export default function Cart({ cartItems, updateQuantity, removeItem }) {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title="Your cart" />
+            <MetaData title="Your cart" noIndex />
             <Typography variant="h1" sx={{ mb: 3 }}>Your cart <Typography component="span" color="text.secondary" sx={{ fontSize: '1rem', fontWeight: 500 }}>({units} item{units === 1 ? '' : 's'})</Typography></Typography>
 
             <Grid container spacing={3}>

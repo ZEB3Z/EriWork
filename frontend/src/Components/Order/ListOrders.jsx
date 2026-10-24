@@ -38,7 +38,7 @@ export default function ListOrders() {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title="My orders" />
+            <MetaData title="My orders" noIndex />
             <PageHeader title="My orders" subtitle="Track the status of your purchases." />
             {!loading && orders.length === 0 ? (
                 <EmptyState icon={<ReceiptLongOutlined />} title="No orders yet" message="When you buy something, it will show up here."

@@ -1,10 +1,14 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { getUser } from '../../Utils/helpers'
+import { useSelector } from 'react-redux'
+import Loader from '../Layout/Loader'
 
 // Sends guests to the login page (and back here afterwards). Admin-only pages need isAdmin.
 export default function ProtectedRoute({ children, isAdmin = false }) {
     const location = useLocation()
-    const user = getUser()
+    const { user, loading } = useSelector((state) => state.auth)
+
+    // Still checking the session cookie (GET /me) — don't bounce to /login yet.
+    if (loading) return <Loader />
 
     if (!user) {
         const back = encodeURIComponent(location.pathname.slice(1))

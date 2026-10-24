@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { toast } from 'react-toastify'
@@ -10,13 +11,19 @@ import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import api, { getErrorMessage } from '../../api'
-import { getUser } from '../../Utils/helpers'
 import { reviewSchema } from '../../Utils/validation'
 import FormField from '../Common/FormField'
 
 // Lets a customer who bought the product write a review, or edit the one they wrote.
-export default function ReviewForm({ productId, onSaved }) {
-    const user = getUser()
+// The session is restored asynchronously (GET /me), so the form is re-created
+// once we know who is logged in — that re-runs the purchase check for them.
+export default function ReviewForm(props) {
+    const { user, loading } = useSelector((state) => state.auth)
+    if (loading) return null
+    return <ReviewFormContent key={user ? user._id : 'guest'} user={user} {...props} />
+}
+
+function ReviewFormContent({ user, productId, onSaved }) {
     const [status, setStatus] = useState({ loading: Boolean(user), canReview: false, existing: null })
 
     const { control, handleSubmit, reset, formState: { isSubmitting } } = useForm({

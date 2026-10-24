@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import { toast } from 'react-toastify'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
@@ -21,14 +22,16 @@ import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import EmptyState from '../Common/EmptyState'
 import ReviewSection from '../Review/ReviewSection'
+import { addItemToCart } from '../../redux/actions/cartActions'
 
 // A fresh ProductDetails is mounted for every product id, so no state carries over.
-export default function ProductPage(props) {
+export default function ProductPage() {
     const { id } = useParams()
-    return <ProductDetails key={id} id={id} {...props} />
+    return <ProductDetails key={id} id={id} />
 }
 
-function ProductDetails({ id, addItemToCart }) {
+function ProductDetails({ id }) {
+    const dispatch = useDispatch()
     const [product, setProduct] = useState(null)
     const [error, setError] = useState('')
     const [activeImage, setActiveImage] = useState(0)
@@ -43,20 +46,24 @@ function ProductDetails({ id, addItemToCart }) {
             .catch((err) => setError(getErrorMessage(err)))
     }, [id, refresh])
 
-    if (error) return <EmptyState title="Product not found" message={error} action={<Button component={Link} to="/" variant="contained">Back to shop</Button>} />
+    if (error) return <><MetaData title="Product not found" noIndex /><EmptyState title="Product not found" message={error} action={<Button component={Link} to="/" variant="contained">Back to shop</Button>} /></>
     if (!product) return <Loader />
 
     const inStock = product.stock > 0
     const image = product.images[activeImage] || product.images[0]
 
     const handleAdd = () => {
-        addItemToCart(product, quantity)
+        dispatch(addItemToCart(product, quantity))
         toast.success(`Added ${quantity} × ${product.name} to cart`)
     }
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title={product.name} />
+            <MetaData
+                title={product.name}
+                description={`${product.name} — ${product.category} from EriWork. ${product.description}`}
+                image={image ? resolveImageUrl(image.url) : undefined}
+            />
             <Breadcrumbs sx={{ mb: 3 }}>
                 <Box component={Link} to="/" sx={{ color: 'text.secondary', textDecoration: 'none' }}>Shop</Box>
                 <Typography color="text.secondary">{product.category}</Typography>

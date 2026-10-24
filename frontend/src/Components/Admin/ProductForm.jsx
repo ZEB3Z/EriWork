@@ -27,7 +27,7 @@ export default function ProductForm() {
 
     const [loading, setLoading] = useState(isEdit)
     const [existingImages, setExistingImages] = useState([]) // already on the server
-    const [newImages, setNewImages] = useState([])           // base64, not uploaded yet
+    const [newImages, setNewImages] = useState([])           // [{ file, preview }], not uploaded yet
     const [imageError, setImageError] = useState('')
 
     const { control, handleSubmit, reset, formState: { isSubmitting } } = useForm({
@@ -60,7 +60,11 @@ export default function ProductForm() {
             return
         }
         try {
-            const payload = { ...values, images: newImages, keepImages: existingImages.map((img) => img.public_id) }
+            // multipart/form-data: Multer receives the files on the API and streams them to Cloudinary.
+            const payload = new FormData()
+            Object.entries(values).forEach(([key, value]) => payload.append(key, value))
+            payload.append('keepImages', JSON.stringify(existingImages.map((img) => img.public_id)))
+            newImages.forEach((img) => payload.append('images', img.file))
             if (isEdit) {
                 await api.put(`/admin/product/${id}`, payload)
                 toast.success('Product updated')
@@ -83,7 +87,7 @@ export default function ProductForm() {
 
     return (
         <>
-            <MetaData title={isEdit ? 'Edit product' : 'New product'} />
+            <MetaData title={isEdit ? 'Edit product' : 'New product'} noIndex />
             <PageHeader title={isEdit ? 'Edit product' : 'New product'} subtitle={isEdit ? 'Update details and photos.' : 'Add an item to the catalog.'} />
 
             <Box component="form" onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate>

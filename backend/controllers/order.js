@@ -29,7 +29,7 @@ exports.newOrder = async (req, res) => {
             name: product.name,
             price: product.price,
             quantity,
-            image: product.images[0] ? product.images[0].url : '/uploads/products/placeholder.png'
+            image: product.images[0] ? product.images[0].url : 'placeholder'
         })
     }
 

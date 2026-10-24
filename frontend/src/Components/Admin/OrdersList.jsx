@@ -14,7 +14,7 @@ import { formatMoney, formatDate, shortId } from '../../Utils/helpers'
 import MetaData from '../Layout/MetaData'
 import PageHeader from '../Common/PageHeader'
 import StatusChip from '../Common/StatusChip'
-import ConfirmDialog from '../Common/ConfirmDialog'
+import { confirmDelete } from '../../Utils/alerts'
 
 const TABS = ['All', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
 
@@ -24,8 +24,6 @@ export default function OrdersList() {
     const [totalAmount, setTotalAmount] = useState(0)
     const [loading, setLoading] = useState(true)
     const [tab, setTab] = useState('All')
-    const [toDelete, setToDelete] = useState(null)
-    const [deleting, setDeleting] = useState(false)
 
     // Bump "refresh" to load the list again (e.g. after deleting).
     const [refresh, setRefresh] = useState(0)
@@ -41,17 +39,16 @@ export default function OrdersList() {
             .finally(() => setLoading(false))
     }, [refresh])
 
-    const confirmDelete = async () => {
-        setDeleting(true)
-        try {
-            await api.delete(`/admin/order/${toDelete._id}`)
+    const askDelete = async (order) => {
+        const deleted = await confirmDelete({
+            title: 'Delete order?',
+            text: `Order ${shortId(order._id)} will be removed permanently.`,
+            action: () => api.delete(`/admin/order/${order._id}`)
+        })
+        if (deleted) {
             toast.success('Order deleted')
-            setToDelete(null)
             loadOrders()
-        } catch (err) {
-            toast.error(getErrorMessage(err))
         }
-        setDeleting(false)
     }
 
     const count = (status) => (status === 'All' ? orders.length : orders.filter((o) => o.orderStatus === status).length)
@@ -69,7 +66,7 @@ export default function OrdersList() {
             renderCell: ({ row }) => (
                 <>
                     <Button size="small" onClick={() => navigate(`/admin/order/${row._id}`)}>Manage</Button>
-                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => setToDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => askDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
                 </>
             )
         }
@@ -77,7 +74,7 @@ export default function OrdersList() {
 
     return (
         <>
-            <MetaData title="Orders" />
+            <MetaData title="Orders" noIndex />
             <PageHeader title="Orders" subtitle={`${orders.length} orders · ${formatMoney(totalAmount)} in sales (excluding cancelled)`} />
             <Paper variant="outlined">
                 <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="scrollable" sx={{ px: 1, borderBottom: 1, borderColor: 'divider' }}>
@@ -96,14 +93,6 @@ export default function OrdersList() {
                     sx={{ border: 0 }}
                 />
             </Paper>
-            <ConfirmDialog
-                open={Boolean(toDelete)}
-                title="Delete order?"
-                message={toDelete ? `Order ${shortId(toDelete._id)} will be removed permanently.` : ''}
-                loading={deleting}
-                onConfirm={confirmDelete}
-                onClose={() => setToDelete(null)}
-            />
         </>
     )
 }

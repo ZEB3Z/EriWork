@@ -32,7 +32,7 @@ export default function OrderDetails() {
     const s = order.shippingInfo
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title={`Order ${shortId(order._id)}`} />
+            <MetaData title={`Order ${shortId(order._id)}`} noIndex />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 3 }}>
                 <Typography variant="h1">Order {shortId(order._id)}</Typography>
                 <StatusChip status={order.orderStatus} size="medium" />

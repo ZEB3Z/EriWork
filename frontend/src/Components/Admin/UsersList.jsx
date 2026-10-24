@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { toast } from 'react-toastify'
 import { DataGrid } from '@mui/x-data-grid'
 import Paper from '@mui/material/Paper'
@@ -11,18 +12,16 @@ import Box from '@mui/material/Box'
 import EditOutlined from '@mui/icons-material/EditOutlined'
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined'
 import api, { getErrorMessage } from '../../api'
-import { getUser, formatDate, avatarSrc } from '../../Utils/helpers'
+import { formatDate, avatarSrc } from '../../Utils/helpers'
 import MetaData from '../Layout/MetaData'
 import PageHeader from '../Common/PageHeader'
-import ConfirmDialog from '../Common/ConfirmDialog'
+import { confirmDelete } from '../../Utils/alerts'
 
 export default function UsersList() {
     const navigate = useNavigate()
-    const me = getUser()
+    const me = useSelector((state) => state.auth.user)
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
-    const [toDelete, setToDelete] = useState(null)
-    const [deleting, setDeleting] = useState(false)
 
     // Bump "refresh" to load the list again (e.g. after deleting).
     const [refresh, setRefresh] = useState(0)
@@ -37,17 +36,16 @@ export default function UsersList() {
             .finally(() => setLoading(false))
     }, [refresh])
 
-    const confirmDelete = async () => {
-        setDeleting(true)
-        try {
-            await api.delete(`/admin/user/${toDelete._id}`)
-            toast.success(`${toDelete.name} was deleted`)
-            setToDelete(null)
+    const askDelete = async (user) => {
+        const deleted = await confirmDelete({
+            title: 'Delete user?',
+            text: `${user.name} (${user.email}) will lose access permanently.`,
+            action: () => api.delete(`/admin/user/${user._id}`)
+        })
+        if (deleted) {
+            toast.success(`${user.name} was deleted`)
             loadUsers()
-        } catch (err) {
-            toast.error(getErrorMessage(err))
         }
-        setDeleting(false)
     }
 
     const columns = [
@@ -71,7 +69,7 @@ export default function UsersList() {
                     <>
                         <Tooltip title="Edit"><IconButton size="small" onClick={() => navigate(`/admin/user/${row._id}`)}><EditOutlined fontSize="small" /></IconButton></Tooltip>
                         <Tooltip title={isMe ? "You can't delete yourself" : 'Delete'}>
-                            <span><IconButton size="small" color="error" disabled={isMe} onClick={() => setToDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></span>
+                            <span><IconButton size="small" color="error" disabled={isMe} onClick={() => askDelete(row)}><DeleteOutlined fontSize="small" /></IconButton></span>
                         </Tooltip>
                     </>
                 )
@@ -81,7 +79,7 @@ export default function UsersList() {
 
     return (
         <>
-            <MetaData title="Users" />
+            <MetaData title="Users" noIndex />
             <PageHeader title="Users" subtitle={`${users.length} registered accounts`} />
             <Paper variant="outlined">
                 <DataGrid
@@ -97,14 +95,6 @@ export default function UsersList() {
                     sx={{ border: 0 }}
                 />
             </Paper>
-            <ConfirmDialog
-                open={Boolean(toDelete)}
-                title="Delete user?"
-                message={toDelete ? `${toDelete.name} (${toDelete.email}) will lose access permanently.` : ''}
-                loading={deleting}
-                onConfirm={confirmDelete}
-                onClose={() => setToDelete(null)}
-            />
         </>
     )
 }

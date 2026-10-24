@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { toast } from 'react-toastify'
@@ -16,9 +17,12 @@ import CheckoutSteps from './CheckoutSteps'
 import FormField from '../Common/FormField'
 import { paymentSchema } from '../../Utils/validation'
 import { calculatePrices, formatMoney } from '../../Utils/helpers'
+import { clearCart } from '../../redux/actions/cartActions'
 
 // Demo payment: the card format is checked, but nothing is charged.
-export default function Payment({ cartItems, shippingInfo, clearCart }) {
+export default function Payment() {
+    const dispatch = useDispatch()
+    const { cartItems, shippingInfo } = useSelector((state) => state.cart)
     const [placedOrderId, setPlacedOrderId] = useState(null)
     const { control, handleSubmit, formState: { isSubmitting } } = useForm({
         resolver: yupResolver(paymentSchema),
@@ -40,7 +44,7 @@ export default function Payment({ cartItems, shippingInfo, clearCart }) {
                 shippingInfo
             })
             setPlacedOrderId(data.order._id)
-            clearCart()
+            dispatch(clearCart())
         } catch (err) {
             toast.error(getErrorMessage(err, 'Could not place your order'))
         }
@@ -48,7 +52,7 @@ export default function Payment({ cartItems, shippingInfo, clearCart }) {
 
     return (
         <Container maxWidth="sm" sx={{ py: 4 }}>
-            <MetaData title="Payment" />
+            <MetaData title="Payment" noIndex />
             <CheckoutSteps activeStep={2} />
             <Paper variant="outlined" component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ p: { xs: 2.5, sm: 4 } }}>
                 <Typography variant="h2" sx={{ mb: 1 }}>Payment</Typography>

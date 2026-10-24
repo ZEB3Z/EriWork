@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { Link } from 'react-router-dom'
 import Container from '@mui/material/Container'
 import Paper from '@mui/material/Paper'
@@ -8,24 +9,22 @@ import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
-import api from '../../api'
-import { getUser, updateStoredUser, formatDate, avatarSrc } from '../../Utils/helpers'
+import { formatDate, avatarSrc } from '../../Utils/helpers'
+import { refreshUser } from '../../redux/actions/authActions'
 import MetaData from '../Layout/MetaData'
 
 export default function Profile() {
-    const [user, setUser] = useState(getUser())
+    const dispatch = useDispatch()
+    const user = useSelector((state) => state.auth.user)
 
     // Refresh from the server so the page is never out of date.
     useEffect(() => {
-        api.get('/me').then(({ data }) => {
-            setUser(data.user)
-            updateStoredUser(data.user)
-        }).catch(() => {})
-    }, [])
+        dispatch(refreshUser()).catch(() => {})
+    }, [dispatch])
 
     return (
         <Container maxWidth="sm" sx={{ py: 5 }}>
-            <MetaData title="My profile" />
+            <MetaData title="My profile" noIndex />
             <Paper variant="outlined" sx={{ p: { xs: 3, sm: 4 }, textAlign: 'center' }}>
                 <Avatar src={avatarSrc(user)} alt={user.name}
                     sx={{ width: 112, height: 112, mx: 'auto', mb: 2, bgcolor: 'primary.main', fontSize: 40 }}>

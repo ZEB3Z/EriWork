@@ -1,27 +1,43 @@
 const Product = require('../models/product')
 const { CATEGORIES } = require('../models/product')
 const Order = require('../models/order')
-const localStorage = require('../utils/localStorage')
+const { uploadFiles, destroyImages } = require('../config/cloudinary')
 const { cleanText } = require('../utils/badWords')
+const { validate } = require('../utils/validate')
 
 // Make user text safe to use inside a regular expression.
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// Save an array of base64 data-URI images and return [{ public_id, url }].
-const saveImages = (images = []) => {
-    const list = Array.isArray(images) ? images : [images]
-    return list.filter(Boolean).map((img) => localStorage.saveDataUri(img, 'products'))
-}
-
 // Only these fields can be set from the admin form.
 const pickProductFields = (body) => ({
-    name: body.name,
-    price: body.price,
-    description: body.description,
+    name: String(body.name).trim(),
+    price: Number(body.price),
+    description: String(body.description).trim(),
     category: body.category,
-    seller: body.seller,
-    stock: body.stock
+    seller: String(body.seller).trim(),
+    stock: Number(body.stock)
 })
+
+const PRODUCT_RULES = {
+    name: 'productName',
+    price: 'price',
+    description: 'description',
+    category: 'category',
+    seller: 'seller',
+    stock: 'stock'
+}
+
+// keepImages arrives from a multipart form as a JSON string: '["eriwork/products/abc", ...]'
+const parseKeepImages = (value) => {
+    if (Array.isArray(value)) return value.map(String)
+    if (typeof value !== 'string' || !value) return []
+    try {
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? parsed.map(String) : []
+    } catch {
+        return [value]
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Public
@@ -108,9 +124,11 @@ exports.createProductReview = async (req, res) => {
     if (!rating || rating < 1 || rating > 5) {
         return res.status(400).json({ message: 'Rating must be between 1 and 5' })
     }
-    if (!comment || !comment.trim()) {
+    if (!comment || !String(comment).trim()) {
         return res.status(400).json({ message: 'Please write a comment' })
     }
+    const error = validate(req.body, { productId: 'mongoId', comment: 'reviewComment' })
+    if (error) return res.status(400).json({ message: error })
 
     const product = await Product.findById(productId)
     if (!product) return res.status(404).json({ message: 'Product not found' })
@@ -119,7 +137,7 @@ exports.createProductReview = async (req, res) => {
         return res.status(403).json({ message: 'You can only review products you have purchased' })
     }
 
-    const cleanComment = cleanText(comment.trim())
+    const cleanComment = cleanText(String(comment).trim())
     const existing = product.reviews.find((r) => r.user.toString() === req.user._id.toString())
 
     if (existing) {
@@ -154,40 +172,58 @@ exports.getAdminProducts = async (req, res) => {
     res.status(200).json({ success: true, products })
 }
 
-// POST /admin/product/new  { ...fields, images: [dataUri] }
+// POST /admin/product/new  multipart: { ...fields, images: [files] }
 exports.newProduct = async (req, res) => {
-    const images = saveImages(req.body.images)
-    if (images.length === 0) {
+    // Validate before uploading so a bad form never leaves images in Cloudinary.
+    const error = validate(req.body, PRODUCT_RULES)
+    if (error) return res.status(400).json({ message: error })
+    if (!req.files || req.files.length === 0) {
         return res.status(400).json({ message: 'Please upload at least one image' })
     }
 
-    const product = await Product.create({
-        ...pickProductFields(req.body),
-        images,
-        user: req.user._id
-    })
-    res.status(201).json({ success: true, product })
+    const images = await uploadFiles(req.files, 'products')
+    try {
+        const product = await Product.create({
+            ...pickProductFields(req.body),
+            images,
+            user: req.user._id
+        })
+        res.status(201).json({ success: true, product })
+    } catch (err) {
+        await destroyImages(images)
+        throw err
+    }
 }
 
-// PUT /admin/product/:id  { ...fields, keepImages: [public_id], images: [dataUri] }
+// PUT /admin/product/:id  multipart: { ...fields, keepImages: '[public_id, ...]', images: [files] }
 exports.updateProduct = async (req, res) => {
     const product = await Product.findById(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
-    const keepIds = req.body.keepImages || []
+    const error = validate(req.body, PRODUCT_RULES)
+    if (error) return res.status(400).json({ message: error })
+
+    const keepIds = parseKeepImages(req.body.keepImages)
     const keptImages = product.images.filter((img) => keepIds.includes(img.public_id))
     const removedImages = product.images.filter((img) => !keepIds.includes(img.public_id))
+    const files = req.files || []
 
-    if (keptImages.length === 0 && (!req.body.images || req.body.images.length === 0)) {
+    if (keptImages.length === 0 && files.length === 0) {
         return res.status(400).json({ message: 'A product needs at least one image' })
     }
-    const newImages = saveImages(req.body.images)
+    const newImages = await uploadFiles(files, 'products')
 
     Object.assign(product, pickProductFields(req.body))
     product.images = [...keptImages, ...newImages]
-    await product.save()
+    try {
+        await product.save()
+    } catch (err) {
+        await destroyImages(newImages)
+        throw err
+    }
 
-    removedImages.forEach((img) => localStorage.destroy(img.public_id))
+    // Photos the admin removed are deleted from Cloudinary.
+    await destroyImages(removedImages)
 
     res.status(200).json({ success: true, product })
 }
@@ -197,7 +233,7 @@ exports.deleteProduct = async (req, res) => {
     const product = await Product.findByIdAndDelete(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
-    product.images.forEach((img) => localStorage.destroy(img.public_id))
+    await destroyImages(product.images)
     res.status(200).json({ success: true, message: 'Product deleted' })
 }
 
@@ -208,9 +244,13 @@ exports.bulkDeleteProducts = async (req, res) => {
         return res.status(400).json({ message: 'No products selected' })
     }
 
+    if (ids.some((id) => validate({ id }, { id: 'mongoId' }))) {
+        return res.status(400).json({ message: 'Invalid product id in selection' })
+    }
+
     const products = await Product.find({ _id: { $in: ids } })
     await Product.deleteMany({ _id: { $in: ids } })
-    products.forEach((p) => p.images.forEach((img) => localStorage.destroy(img.public_id)))
+    await Promise.all(products.map((p) => destroyImages(p.images)))
 
     res.status(200).json({ success: true, deletedCount: products.length })
 }

@@ -64,7 +64,7 @@ export default function ProcessOrder() {
 
     return (
         <>
-            <MetaData title={`Order ${shortId(order._id)}`} />
+            <MetaData title={`Order ${shortId(order._id)}`} noIndex />
             <Button component={Link} to="/admin/orders" startIcon={<ArrowBackRounded />} sx={{ mb: 2 }}>All orders</Button>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 0.5 }}>
                 <Typography variant="h2" component="h1">Order {shortId(order._id)}</Typography>

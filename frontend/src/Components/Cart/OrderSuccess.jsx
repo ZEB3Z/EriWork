@@ -13,7 +13,7 @@ export default function OrderSuccess() {
 
     return (
         <Container maxWidth="sm" sx={{ py: 8 }}>
-            <MetaData title="Order placed" />
+            <MetaData title="Order placed" noIndex />
             <Paper variant="outlined" sx={{ p: 5, textAlign: 'center' }}>
                 <CheckCircleRounded color="success" sx={{ fontSize: 72 }} />
                 <Typography variant="h1" sx={{ mt: 1 }}>Thank you for your order!</Typography>

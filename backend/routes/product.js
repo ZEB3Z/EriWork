@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { isAuthenticatedUser, authorizeRoles } = require('../middlewares/auth')
+const { uploadProductImages } = require('../middlewares/upload')
 const p = require('../controllers/product')
 
 const admin = [isAuthenticatedUser, authorizeRoles('admin')]
@@ -16,8 +17,8 @@ router.put('/review', isAuthenticatedUser, p.createProductReview)
 
 // Admin
 router.get('/admin/products', admin, p.getAdminProducts)
-router.post('/admin/product/new', admin, p.newProduct)
-router.put('/admin/product/:id', admin, p.updateProduct)
+router.post('/admin/product/new', admin, uploadProductImages, p.newProduct)
+router.put('/admin/product/:id', admin, uploadProductImages, p.updateProduct)
 router.delete('/admin/product/:id', admin, p.deleteProduct)
 router.post('/admin/products/bulk-delete', admin, p.bulkDeleteProducts)
 router.get('/admin/reviews', admin, p.getAllReviews)

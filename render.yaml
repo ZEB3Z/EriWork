@@ -1,0 +1,94 @@
+# Render Blueprint for EriWork — creates both services in one go.
+# Render dashboard > New > Blueprint > pick this repo.
+# Values marked "sync: false" are secrets: Render asks you to type them in
+# during setup, so they never live in this file or on GitHub.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. The API (Express) — a Render Web Service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: eriwork-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production            # turns on Secure + SameSite=None cookies
+      # PORT is provided by Render automatically — don't set it.
+
+      # Database (MongoDB Atlas connection string)
+      - key: MONGO_URI
+        sync: false
+
+      # Login sessions
+      - key: JWT_SECRET
+        sync: false                  # any long random string
+      - key: JWT_EXPIRE
+        value: 7d
+      - key: COOKIE_EXPIRE
+        value: "7"
+
+      # The website's address (your Static Site URL, no trailing slash)
+      - key: FRONTEND_URL
+        sync: false
+
+      # Image storage (Cloudinary)
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # Email (Nodemailer -> Mailtrap SMTP). Port 2525: Render's free tier
+      # blocks outbound SMTP on ports 25, 465 and 587.
+      - key: SMTP_HOST
+        value: sandbox.smtp.mailtrap.io
+      - key: SMTP_PORT
+        value: "2525"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        value: EriWork <noreply@eriwork.local>
+
+      # Google / Facebook sign-in (optional — leave blank to disable)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 2. The website (React + Vite) — a Render Static Site
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: eriwork-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist        # relative to rootDir, i.e. frontend/dist
+    routes:
+      # Send every path to index.html so React Router pages work on refresh.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Vite bakes these in at BUILD time: after changing one, redeploy the site.
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL
+        sync: false                  # https://<api-service>.onrender.com/api/v1
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false

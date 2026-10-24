@@ -16,7 +16,7 @@ import api, { getErrorMessage } from '../../api'
 import { resolveImageUrl, formatMoney } from '../../Utils/helpers'
 import MetaData from '../Layout/MetaData'
 import PageHeader from '../Common/PageHeader'
-import ConfirmDialog from '../Common/ConfirmDialog'
+import { confirmDelete, escapeHtml } from '../../Utils/alerts'
 
 const EMPTY_SELECTION = { type: 'include', ids: new Set() }
 
@@ -26,8 +26,6 @@ export default function ProductsList() {
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
     const [selection, setSelection] = useState(EMPTY_SELECTION)
-    const [toDelete, setToDelete] = useState(null) // { ids: [...], label }
-    const [deleting, setDeleting] = useState(false)
 
     // Bump "refresh" to load the list again (e.g. after deleting).
     const [refresh, setRefresh] = useState(0)
@@ -47,34 +45,31 @@ export default function ProductsList() {
     // lists the products by name before anything is removed.
     const selectedCount = selection.type === 'include' ? selection.ids.size : products.length - selection.ids.size
 
-    const askBulkDelete = () => {
-        // Ask the grid itself, so "select all" with a search filter only deletes the matching rows.
-        const rows = Array.from(apiRef.current.getSelectedRows().values())
-        if (rows.length) {
-            setToDelete({
-                ids: rows.map((r) => r._id),
-                names: rows.map((r) => r.name),
-                label: `${rows.length} product${rows.length === 1 ? '' : 's'}`
-            })
+    // SweetAlert2 confirmation that lists the products by name before anything is removed.
+    const askDelete = async (rows) => {
+        const ids = rows.map((r) => r._id)
+        const label = `${rows.length} product${rows.length === 1 ? '' : 's'}`
+        const names = rows.slice(0, 5).map((r) => `<li>${escapeHtml(r.name)}</li>`).join('')
+        const more = rows.length > 5 ? `<li>and ${rows.length - 5} more</li>` : ''
+        const deleted = await confirmDelete({
+            title: rows.length === 1 ? 'Delete product?' : 'Delete products?',
+            html: `This permanently deletes ${label} and ${rows.length === 1 ? 'its' : 'their'} photos:<ul>${names}${more}</ul>`,
+            confirmText: `Delete ${label}`,
+            action: () => ids.length === 1
+                ? api.delete(`/admin/product/${ids[0]}`)
+                : api.post('/admin/products/bulk-delete', { ids })
+        })
+        if (deleted) {
+            toast.success(`Deleted ${label}`)
+            setSelection(EMPTY_SELECTION)
+            loadProducts()
         }
     }
 
-    const confirmDelete = async () => {
-        setDeleting(true)
-        try {
-            if (toDelete.ids.length === 1) {
-                await api.delete(`/admin/product/${toDelete.ids[0]}`)
-            } else {
-                await api.post('/admin/products/bulk-delete', { ids: toDelete.ids })
-            }
-            toast.success(`Deleted ${toDelete.label}`)
-            setSelection(EMPTY_SELECTION)
-            setToDelete(null)
-            loadProducts()
-        } catch (err) {
-            toast.error(getErrorMessage(err))
-        }
-        setDeleting(false)
+    const askBulkDelete = () => {
+        // Ask the grid itself, so "select all" with a search filter only deletes the matching rows.
+        const rows = Array.from(apiRef.current.getSelectedRows().values())
+        if (rows.length) askDelete(rows)
     }
 
     const columns = [
@@ -101,7 +96,7 @@ export default function ProductsList() {
             renderCell: ({ row }) => (
                 <>
                     <Tooltip title="Edit"><IconButton size="small" onClick={() => navigate(`/admin/product/${row._id}`)}><EditOutlined fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => setToDelete({ ids: [row._id], names: [row.name], label: '1 product' })}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => askDelete([row])}><DeleteOutlined fontSize="small" /></IconButton></Tooltip>
                 </>
             )
         }
@@ -109,7 +104,7 @@ export default function ProductsList() {
 
     return (
         <>
-            <MetaData title="Products" />
+            <MetaData title="Products" noIndex />
             <PageHeader
                 title="Products"
                 subtitle={`${products.length} products in the catalog`}
@@ -142,22 +137,6 @@ export default function ProductsList() {
                 />
             </Paper>
 
-            <ConfirmDialog
-                open={Boolean(toDelete)}
-                title="Delete products?"
-                message={toDelete ? `This permanently deletes ${toDelete.label} and their photos:` : ''}
-                confirmText={toDelete ? `Delete ${toDelete.label}` : 'Delete'}
-                loading={deleting}
-                onConfirm={confirmDelete}
-                onClose={() => setToDelete(null)}
-            >
-                {toDelete && (
-                    <Box component="ul" sx={{ mt: 1.5, mb: 0, pl: 2.5, color: 'text.primary' }}>
-                        {toDelete.names.slice(0, 5).map((n) => <li key={n}>{n}</li>)}
-                        {toDelete.names.length > 5 && <li>and {toDelete.names.length - 5} more</li>}
-                    </Box>
-                )}
-            </ConfirmDialog>
         </>
     )
 }

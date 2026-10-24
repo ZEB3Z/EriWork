@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { useParams, useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
 import Box from '@mui/material/Box'
@@ -11,21 +11,21 @@ import Skeleton from '@mui/material/Skeleton'
 import CircularProgress from '@mui/material/CircularProgress'
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded'
 import TuneRounded from '@mui/icons-material/TuneRounded'
-import api, { getErrorMessage } from '../api'
 import MetaData from './Layout/MetaData'
 import ProductCard from './Product/ProductCard'
 import FilterPanel from './Product/FilterPanel'
 import EmptyState from './Common/EmptyState'
-
-const PAGE_SIZE = 8
-const EMPTY_FILTERS = { category: '', price: null, ratings: 0 }
+import { fetchProducts, fetchProductsMeta, setFilters as setFiltersAction } from '../redux/actions/productActions'
+import { EMPTY_FILTERS } from '../redux/reducers/productReducer'
 
 export default function Home() {
     const { keyword = '' } = useParams()
     const navigate = useNavigate()
+    const dispatch = useDispatch()
 
-    const [meta, setMeta] = useState(null)
-    const [filters, setFilters] = useState(EMPTY_FILTERS)
+    // Product list, filters and filter-panel data live in Redux (src/redux).
+    const { meta, filters, requested, list } = useSelector((state) => state.products)
+    const setFilters = (next) => dispatch(setFiltersAction(next))
     const [showFilters, setShowFilters] = useState(false) // phones only; always shown on desktop
     // The search + filters as one string. A new string means "start over at page 1".
     const queryKey = JSON.stringify({
@@ -36,45 +36,19 @@ export default function Home() {
         ratings: filters.ratings || undefined
     })
 
-    // "requested" = the page we want; "list" = what has been loaded so far.
-    const [requested, setRequested] = useState({ key: queryKey, page: 1 })
-    const [list, setList] = useState({ key: null, page: 0, products: [], total: 0, hasMore: false })
+    // "requested" = the page we want; "list" = what has been loaded so far (both in Redux).
     const sentinelRef = useRef(null) // invisible box at the end of the grid
 
-    // Filters changed: ask for page 1 of the new results (React's "adjust state during render" pattern).
-    if (requested.key !== queryKey) setRequested({ key: queryKey, page: 1 })
+    // Still loading if the search/filters changed but page 1 hasn't been asked for yet,
+    // or if the requested page hasn't arrived.
+    const loading = requested.key !== queryKey || list.key !== requested.key || list.page !== requested.page
 
-    const loading = list.key !== requested.key || list.page !== requested.page
+    // Price bounds + categories for the filter panel (loaded once).
+    useEffect(() => { dispatch(fetchProductsMeta()) }, [dispatch])
 
-    // Price bounds + categories for the filter panel.
-    useEffect(() => {
-        api.get('/products/meta')
-            .then(({ data }) => setMeta(data))
-            .catch((err) => toast.error(getErrorMessage(err)))
-    }, [])
-
-    // Fetch the requested page. If the filters change mid-request, the old answer is ignored.
-    useEffect(() => {
-        let cancelled = false
-        const params = { ...JSON.parse(requested.key), page: requested.page, limit: PAGE_SIZE }
-        api.get('/products', { params })
-            .then(({ data }) => {
-                if (cancelled) return
-                setList((prev) => ({
-                    key: requested.key,
-                    page: requested.page,
-                    products: requested.page === 1 ? data.products : [...prev.products, ...data.products],
-                    total: data.total,
-                    hasMore: data.hasMore
-                }))
-            })
-            .catch((err) => {
-                if (cancelled) return
-                toast.error(getErrorMessage(err))
-                setList((prev) => ({ ...prev, key: requested.key, page: requested.page, hasMore: false }))
-            })
-        return () => { cancelled = true }
-    }, [requested])
+    // New search/filters (or arriving on the page): load page 1. A late answer for
+    // old filters is ignored by the reducer.
+    useEffect(() => { dispatch(fetchProducts(queryKey, 1)) }, [dispatch, queryKey])
 
     // Infinite scroll: when the sentinel comes near the screen, request the next page.
     // The observer is re-created after every load, so it also fires when the
@@ -83,11 +57,11 @@ export default function Home() {
         const el = sentinelRef.current
         if (!el || loading || !list.hasMore) return
         const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) setRequested({ key: list.key, page: list.page + 1 })
+            if (entries[0].isIntersecting) dispatch(fetchProducts(list.key, list.page + 1))
         }, { rootMargin: '300px' })
         observer.observe(el)
         return () => observer.disconnect()
-    }, [loading, list.hasMore, list.key, list.page])
+    }, [dispatch, loading, list.hasMore, list.key, list.page])
 
     // Only show products that belong to the current filters.
     const products = list.key === queryKey ? list.products : []
@@ -102,7 +76,10 @@ export default function Home() {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <MetaData title={keyword ? `Search: ${keyword}` : 'Shop networking gear'} />
+            <MetaData
+                title={keyword ? `Search: ${keyword}` : 'Shop networking gear'}
+                description="Shop WiFi 6 routers, mesh WiFi systems, range extenders, access points, switches, adapters and Ethernet cables at EriWork."
+            />
 
             <Box sx={{ mb: 3 }}>
                 <Typography variant="h1">{keyword ? `Results for “${keyword}”` : 'Networking gear'}</Typography>
