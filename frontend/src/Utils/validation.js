@@ -43,7 +43,7 @@ export const resetPasswordSchema = yup.object({ password: newPassword, confirmPa
 export const productSchema = yup.object({
     name: yup.string().trim().required('Product name is required').max(100, 'Name cannot exceed 100 characters'),
     price: yup.number().typeError('Price must be a number').required('Price is required')
-        .positive('Price must be greater than 0').max(100000, 'Price looks too high'),
+        .positive('Price must be greater than 0').max(6000000, 'Price looks too high'),
     description: yup.string().trim().required('Description is required').min(10, 'Description should be at least 10 characters'),
     category: yup.string().required('Choose a category').oneOf(CATEGORIES, 'Choose a category'),
     seller: yup.string().trim().required('Seller is required'),

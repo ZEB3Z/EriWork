@@ -2,11 +2,9 @@ const crypto = require('crypto')
 const User = require('../models/user')
 const { DEFAULT_AVATAR } = require('../models/user')
 const { uploadBuffer, destroyImage } = require('../config/cloudinary')
-const sendEmail = require('../utils/sendEmail')
 const { validate, normalizeEmail } = require('../utils/validate')
 const { verifyFirebaseToken, firebaseConfigured, SOCIAL_PROVIDERS } = require('../utils/firebase')
-
-const frontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '')
+const { issueOtp, verifyOtp } = require('../utils/otp')
 
 // Cookie settings. In production the website (Render Static Site) and the API
 // (Render Web Service) live on different onrender.com subdomains, which browsers
@@ -36,7 +34,22 @@ const sendToken = (user, statusCode, res) => {
 // Upload the avatar Multer received (if any) to Cloudinary.
 const saveAvatar = (file) => (file ? uploadBuffer(file.buffer, 'avatars') : null)
 
-// POST /register  multipart: { name, email, password, avatar? (file) }
+// POST /register/otp  { name, email, password } — step 1 of sign-up.
+// Checks the details and emails a 6-digit code. Nothing is saved yet.
+exports.requestRegisterOtp = async (req, res) => {
+    const error = validate(req.body, { name: 'name', email: 'email', password: 'password' })
+    if (error) return res.status(400).json({ message: error })
+
+    const email = normalizeEmail(req.body.email)
+    if (await User.findOne({ email })) {
+        return res.status(400).json({ message: 'An account with this email already exists' })
+    }
+    const info = await issueOtp({ email, purpose: 'register', name: req.body.name.trim() })
+    res.status(200).json({ success: true, message: `We sent a 6-digit code to ${email}`, ...info })
+}
+
+// POST /register  multipart: { name, email, password, otp, avatar? (file) } — step 2 of sign-up.
+// The account is only created when the emailed code is correct.
 exports.registerUser = async (req, res) => {
     const { name, password } = req.body
     const error = validate(req.body, { name: 'name', email: 'email', password: 'password' })
@@ -46,6 +59,7 @@ exports.registerUser = async (req, res) => {
     if (await User.findOne({ email })) {
         return res.status(400).json({ message: 'An account with this email already exists' })
     }
+    await verifyOtp({ email, purpose: 'register', code: req.body.otp })
 
     const avatar = (await saveAvatar(req.file)) || DEFAULT_AVATAR
     let user
@@ -58,7 +72,7 @@ exports.registerUser = async (req, res) => {
     sendToken(user, 201, res)
 }
 
-// POST /login  { email, password }
+// POST /login  { email, password } — step 1: check the password, then email a code.
 exports.loginUser = async (req, res) => {
     const { password } = req.body
     if (!req.body.email || !password) {
@@ -67,11 +81,38 @@ exports.loginUser = async (req, res) => {
     const error = validate(req.body, { email: 'email' })
     if (error) return res.status(400).json({ message: error })
 
-    const user = await User.findOne({ email: normalizeEmail(req.body.email) }).select('+password')
+    const email = normalizeEmail(req.body.email)
+    const user = await User.findOne({ email }).select('+password')
     if (!user || !(await user.comparePassword(String(password)))) {
         return res.status(401).json({ message: 'Invalid email or password' })
     }
+    const info = await issueOtp({ email, purpose: 'login', name: user.name })
+    res.status(200).json({ success: true, otpRequired: true, email, message: `We sent a 6-digit code to ${email}`, ...info })
+}
+
+// POST /login/verify  { email, otp } — step 2: the right code logs you in.
+// A code only exists after a correct password (step 1), so this is safe on its own.
+exports.verifyLogin = async (req, res) => {
+    const error = validate(req.body, { email: 'email' })
+    if (error) return res.status(400).json({ message: error })
+
+    const email = normalizeEmail(req.body.email)
+    await verifyOtp({ email, purpose: 'login', code: req.body.otp })
+
+    const user = await User.findOne({ email })
+    if (!user) return res.status(401).json({ message: 'Account not found' })
     sendToken(user, 200, res)
+}
+
+// POST /otp/send  { purpose: 'checkout' | 'password' } — logged-in users ask for a code
+// to confirm a sensitive action. It always goes to the email on their own account.
+exports.sendActionOtp = async (req, res) => {
+    const { purpose } = req.body
+    if (!['checkout', 'password'].includes(purpose)) {
+        return res.status(400).json({ message: 'Unknown verification purpose' })
+    }
+    const info = await issueOtp({ email: req.user.email, purpose, name: req.user.name })
+    res.status(200).json({ success: true, message: `We sent a 6-digit code to ${req.user.email}`, email: req.user.email, ...info })
 }
 
 // GET /logout — clears the session cookie
@@ -124,61 +165,32 @@ exports.socialLogin = async (req, res) => {
     sendToken(user, 200, res)
 }
 
-// POST /password/forgot  { email }
+// POST /password/forgot  { email } — emails a 6-digit reset code.
 exports.forgotPassword = async (req, res) => {
     const error = validate(req.body, { email: 'email' })
     if (error) return res.status(400).json({ message: error })
 
-    const user = await User.findOne({ email: normalizeEmail(req.body.email) })
+    const email = normalizeEmail(req.body.email)
+    const user = await User.findOne({ email })
     if (!user) {
         return res.status(404).json({ message: 'No account found with this email' })
     }
-
-    const resetToken = user.getResetPasswordToken()
-    await user.save({ validateBeforeSave: false })
-
-    const resetUrl = `${frontendUrl()}/password/reset/${resetToken}`
-    console.log('Password reset link for', user.email, '=>', resetUrl)
-
-    try {
-        await sendEmail({
-            email: user.email,
-            subject: 'EriWork — Reset your password',
-            message: `Hi ${user.name},\n\nReset your password using this link (valid for 30 minutes):\n${resetUrl}\n\nIf you didn't ask for this, you can ignore this email.`,
-            html: `
-<div style="background:#f5f7fb;padding:32px 12px;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e3e8f0;border-radius:12px;overflow:hidden;">
-    <div style="background:#0f766e;padding:22px 26px;font-size:22px;font-weight:800;color:#fff;">EriWork</div>
-    <div style="padding:26px;color:#1f2a37;font-size:14px;line-height:1.6;">
-      <p style="margin:0 0 12px;font-size:16px;color:#0f1b2d;">Hi ${user.name},</p>
-      <p style="margin:0 0 20px;">We received a request to reset your password. This link is valid for 30 minutes.</p>
-      <a href="${resetUrl}" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:700;">Reset password</a>
-      <p style="margin:20px 0 0;color:#64748b;font-size:13px;">If you didn't ask for this, you can safely ignore this email.</p>
-    </div>
-  </div>
-</div>`
-        })
-        res.status(200).json({ success: true, message: `Reset link sent to ${user.email}` })
-    } catch (error) {
-        user.resetPasswordToken = undefined
-        user.resetPasswordExpire = undefined
-        await user.save({ validateBeforeSave: false })
-        res.status(500).json({ message: 'Could not send the email. Check the SMTP settings in backend/.env' })
-    }
+    const info = await issueOtp({ email, purpose: 'reset', name: user.name })
+    res.status(200).json({ success: true, message: `We sent a 6-digit code to ${email}`, ...info })
 }
 
-// PUT /password/reset/:token  { password, confirmPassword }
+// PUT /password/reset  { email, otp, password, confirmPassword }
 exports.resetPassword = async (req, res) => {
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex')
-    const user = await User.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } })
-    if (!user) {
-        return res.status(400).json({ message: 'This reset link is invalid or has expired' })
-    }
-    const error = validate(req.body, { password: 'password' })
+    const error = validate(req.body, { email: 'email', password: 'password' })
     if (error) return res.status(400).json({ message: error })
     if (req.body.password !== req.body.confirmPassword) {
         return res.status(400).json({ message: 'Passwords do not match' })
     }
+
+    const email = normalizeEmail(req.body.email)
+    const user = await User.findOne({ email })
+    if (!user) return res.status(400).json({ message: 'This code is invalid or has expired' })
+    await verifyOtp({ email, purpose: 'reset', code: req.body.otp })
 
     user.password = req.body.password
     user.resetPasswordToken = undefined
@@ -227,7 +239,7 @@ exports.updateProfile = async (req, res) => {
     res.status(200).json({ success: true, user })
 }
 
-// PUT /password/update  { oldPassword, password }
+// PUT /password/update  { oldPassword, password, otp }
 exports.updatePassword = async (req, res) => {
     const user = await User.findById(req.user._id).select('+password')
     if (!(await user.comparePassword(String(req.body.oldPassword || '')))) {
@@ -235,6 +247,7 @@ exports.updatePassword = async (req, res) => {
     }
     const error = validate(req.body, { password: 'password' })
     if (error) return res.status(400).json({ message: error })
+    await verifyOtp({ email: user.email, purpose: 'password', code: req.body.otp })
     user.password = req.body.password
     await user.save()
     sendToken(user, 200, res)

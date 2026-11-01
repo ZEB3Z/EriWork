@@ -10,20 +10,27 @@ import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
 import LockOutlined from '@mui/icons-material/LockOutlined'
 import api, { getErrorMessage } from '../../api'
 import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
 import FormField from '../Common/FormField'
+import OtpPanel from '../Common/OtpPanel'
+import { sendActionOtp } from '../../Utils/otp'
 import { paymentSchema } from '../../Utils/validation'
 import { calculatePrices, formatMoney } from '../../Utils/helpers'
 import { clearCart } from '../../redux/actions/cartActions'
 
 // Demo payment: the card format is checked, but nothing is charged.
+// Before the order is placed, a 6-digit code emailed to the customer must be entered.
 export default function Payment() {
     const dispatch = useDispatch()
     const { cartItems, shippingInfo } = useSelector((state) => state.cart)
     const [placedOrderId, setPlacedOrderId] = useState(null)
+    const [otpEmail, setOtpEmail] = useState('') // set while the code dialog is open
     const { control, handleSubmit, formState: { isSubmitting } } = useForm({
         resolver: yupResolver(paymentSchema),
         defaultValues: { cardName: '', cardNumber: '', expiry: '', cvc: '' }
@@ -37,17 +44,27 @@ export default function Payment() {
 
     const { totalPrice } = calculatePrices(cartItems)
 
+    // Step 1: the card looks valid -> email a code and open the dialog.
     const onSubmit = async () => {
         try {
-            const { data } = await api.post('/order/new', {
-                orderItems: cartItems.map((i) => ({ product: i.product, quantity: i.quantity })),
-                shippingInfo
-            })
-            setPlacedOrderId(data.order._id)
-            dispatch(clearCart())
+            const data = await sendActionOtp('checkout')
+            setOtpEmail(data.email)
+            toast.info('Check your email for the 6-digit code')
         } catch (err) {
-            toast.error(getErrorMessage(err, 'Could not place your order'))
+            toast.error(getErrorMessage(err, 'Could not send the verification code'))
         }
+    }
+
+    // Step 2: the right code places the order. Errors show under the code field.
+    const placeOrder = async (otp) => {
+        const { data } = await api.post('/order/new', {
+            orderItems: cartItems.map((i) => ({ product: i.product, quantity: i.quantity })),
+            shippingInfo,
+            otp
+        })
+        setOtpEmail('')
+        setPlacedOrderId(data.order._id)
+        dispatch(clearCart())
     }
 
     return (
@@ -66,9 +83,24 @@ export default function Payment() {
                     <Grid size={6}><FormField name="cvc" control={control} label="CVC" placeholder="123" autoComplete="cc-csc" /></Grid>
                 </Grid>
                 <Button type="submit" variant="contained" size="large" fullWidth startIcon={<LockOutlined />} disabled={isSubmitting} sx={{ mt: 3 }}>
-                    {isSubmitting ? 'Placing order…' : `Pay ${formatMoney(totalPrice)}`}
+                    {isSubmitting ? 'Sending code…' : `Pay ${formatMoney(totalPrice)}`}
                 </Button>
             </Paper>
+
+            <Dialog open={Boolean(otpEmail)} onClose={() => setOtpEmail('')} fullWidth maxWidth="xs">
+                <DialogTitle sx={{ fontWeight: 800 }}>Confirm your payment of {formatMoney(totalPrice)}</DialogTitle>
+                <DialogContent>
+                    <OtpPanel
+                        email={otpEmail}
+                        confirmLabel={`Confirm and pay ${formatMoney(totalPrice)}`}
+                        busyLabel="Placing order…"
+                        onConfirm={placeOrder}
+                        onResend={() => sendActionOtp('checkout')}
+                        onBack={() => setOtpEmail('')}
+                        backLabel="Cancel"
+                    />
+                </DialogContent>
+            </Dialog>
         </Container>
     )
 }

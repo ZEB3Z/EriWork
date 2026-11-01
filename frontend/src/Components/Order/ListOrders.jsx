@@ -12,6 +12,7 @@ import PageHeader from '../Common/PageHeader'
 import EmptyState from '../Common/EmptyState'
 import StatusChip from '../Common/StatusChip'
 import { formatMoney, formatDate, shortId } from '../../Utils/helpers'
+import DownloadReceiptButton from '../Common/DownloadReceiptButton'
 
 export default function ListOrders() {
     const [orders, setOrders] = useState([])
@@ -28,11 +29,16 @@ export default function ListOrders() {
         { field: '_id', headerName: 'Order', width: 130, valueFormatter: (value) => shortId(value) },
         { field: 'createdAt', headerName: 'Date', width: 140, type: 'date', valueGetter: (value) => new Date(value), valueFormatter: (value) => formatDate(value) },
         { field: 'items', headerName: 'Items', width: 90, type: 'number', valueGetter: (value, row) => row.orderItems.reduce((s, i) => s + i.quantity, 0) },
-        { field: 'totalPrice', headerName: 'Total', width: 120, type: 'number', valueFormatter: (value) => formatMoney(value) },
+        { field: 'totalPrice', headerName: 'Total', width: 140, type: 'number', valueFormatter: (value) => formatMoney(value) },
         { field: 'orderStatus', headerName: 'Status', width: 140, renderCell: ({ value }) => <StatusChip status={value} /> },
         {
-            field: 'actions', headerName: '', flex: 1, minWidth: 100, sortable: false, filterable: false, align: 'right',
-            renderCell: ({ row }) => <Button component={Link} to={`/order/${row._id}`} size="small">View</Button>
+            field: 'actions', headerName: '', flex: 1, minWidth: 230, sortable: false, filterable: false, align: 'right',
+            renderCell: ({ row }) => (
+                <>
+                    <Button component={Link} to={`/order/${row._id}`} size="small">View</Button>
+                    <DownloadReceiptButton orderId={row._id} variant="text" size="small" label="PDF" sx={{ ml: 0.5 }} />
+                </>
+            )
         }
     ]
 

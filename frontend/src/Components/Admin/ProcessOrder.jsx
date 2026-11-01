@@ -16,6 +16,7 @@ import { formatDate, shortId } from '../../Utils/helpers'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import StatusChip from '../Common/StatusChip'
+import DownloadReceiptButton from '../Common/DownloadReceiptButton'
 import OrderItems from '../Order/OrderItems'
 import PriceSummary from '../Order/PriceSummary'
 
@@ -69,6 +70,8 @@ export default function ProcessOrder() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 0.5 }}>
                 <Typography variant="h2" component="h1">Order {shortId(order._id)}</Typography>
                 <StatusChip status={order.orderStatus} size="medium" />
+                <Box sx={{ flex: 1 }} />
+                <DownloadReceiptButton orderId={order._id} />
             </Box>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
                 Placed {formatDate(order.createdAt)}{order.deliveredAt ? ` · Delivered ${formatDate(order.deliveredAt)}` : ''}

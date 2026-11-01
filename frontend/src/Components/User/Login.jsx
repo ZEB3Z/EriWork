@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
@@ -8,9 +9,10 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import { getErrorMessage } from '../../api'
-import { login } from '../../redux/actions/authActions'
+import { login, verifyLogin } from '../../redux/actions/authActions'
 import { loginSchema } from '../../Utils/validation'
 import FormField from '../Common/FormField'
+import OtpPanel from '../Common/OtpPanel'
 import MetaData from '../Layout/MetaData'
 import AuthCard from './AuthCard'
 import SocialLoginButtons from './SocialLoginButtons'
@@ -23,21 +25,46 @@ export default function Login() {
     const redirect = params.get('redirect')
     const goNext = () => navigate(redirect ? `/${redirect}` : '/', { replace: true })
 
+    // Step 1 = email + password. Step 2 = the 6-digit code we email.
+    const [pending, setPending] = useState(null) // { email, password } while waiting for the code
+
     const { control, handleSubmit, formState: { isSubmitting } } = useForm({
         resolver: yupResolver(loginSchema),
         defaultValues: { email: '', password: '' }
     })
 
-    if (user) return <Navigate to={redirect ? `/${redirect}` : '/'} replace />
+    if (user && !pending) return <Navigate to={redirect ? `/${redirect}` : '/'} replace />
 
     const onSubmit = async (values) => {
         try {
             const data = await dispatch(login(values))
-            toast.success(`Welcome back, ${data.user.name}!`)
-            goNext()
+            setPending({ ...values, email: data.email || values.email })
+            toast.info('Check your email for the 6-digit code')
         } catch (err) {
             toast.error(getErrorMessage(err))
         }
+    }
+
+    const confirmCode = async (code) => {
+        const data = await dispatch(verifyLogin(pending.email, code))
+        toast.success(`Welcome back, ${data.user.name}!`)
+        goNext()
+    }
+
+    if (pending) {
+        return (
+            <AuthCard title="Verify it's you" subtitle="Enter the code we just emailed you to finish logging in.">
+                <MetaData title="Verify login" noIndex />
+                <OtpPanel
+                    email={pending.email}
+                    confirmLabel="Verify and log in"
+                    onConfirm={confirmCode}
+                    onResend={() => dispatch(login({ email: pending.email, password: pending.password }))}
+                    onBack={() => setPending(null)}
+                    backLabel="Back to log in"
+                />
+            </AuthCard>
+        )
     }
 
     return (
@@ -50,7 +77,7 @@ export default function Login() {
                     <Typography component={Link} to="/password/forgot" variant="body2" color="primary">Forgot password?</Typography>
                 </Box>
                 <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-                    {isSubmitting ? 'Logging in…' : 'Log in'}
+                    {isSubmitting ? 'Sending code…' : 'Log in'}
                 </Button>
             </Stack>
             <SocialLoginButtons onSuccess={goNext} />

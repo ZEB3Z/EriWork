@@ -7,6 +7,7 @@ import Box from '@mui/material/Box'
 import CheckCircleRounded from '@mui/icons-material/CheckCircleRounded'
 import MetaData from '../Layout/MetaData'
 import { shortId } from '../../Utils/helpers'
+import DownloadReceiptButton from '../Common/DownloadReceiptButton'
 
 export default function OrderSuccess() {
     const orderId = useLocation().state?.orderId
@@ -23,6 +24,7 @@ export default function OrderSuccess() {
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center', mt: 4, flexWrap: 'wrap' }}>
                     {orderId && <Button component={Link} to={`/order/${orderId}`} variant="contained">View order</Button>}
+                    {orderId && <DownloadReceiptButton orderId={orderId} />}
                     <Button component={Link} to="/" variant="outlined">Keep shopping</Button>
                 </Box>
             </Paper>

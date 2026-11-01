@@ -14,6 +14,7 @@ import StatusChip from '../Common/StatusChip'
 import OrderItems from './OrderItems'
 import PriceSummary from './PriceSummary'
 import { formatDate, shortId } from '../../Utils/helpers'
+import DownloadReceiptButton from '../Common/DownloadReceiptButton'
 
 export default function OrderDetails() {
     const { id } = useParams()
@@ -36,6 +37,8 @@ export default function OrderDetails() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 3 }}>
                 <Typography variant="h1">Order {shortId(order._id)}</Typography>
                 <StatusChip status={order.orderStatus} size="medium" />
+                <Box sx={{ flex: 1 }} />
+                <DownloadReceiptButton orderId={order._id} variant="contained" />
             </Box>
             <Typography color="text.secondary" sx={{ mt: -2, mb: 3 }}>
                 Placed {formatDate(order.createdAt)}{order.deliveredAt ? ` · Delivered ${formatDate(order.deliveredAt)}` : ''}

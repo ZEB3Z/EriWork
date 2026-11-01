@@ -11,9 +11,10 @@ import Box from '@mui/material/Box'
 import Avatar from '@mui/material/Avatar'
 import { getErrorMessage } from '../../api'
 import { checkImageFile, toUpload, releaseUpload } from '../../Utils/helpers'
-import { register } from '../../redux/actions/authActions'
+import { register, requestRegisterOtp } from '../../redux/actions/authActions'
 import { registerSchema } from '../../Utils/validation'
 import FormField from '../Common/FormField'
+import OtpPanel from '../Common/OtpPanel'
 import MetaData from '../Layout/MetaData'
 import AuthCard from './AuthCard'
 import SocialLoginButtons from './SocialLoginButtons'
@@ -25,6 +26,7 @@ export default function Register() {
     const redirect = params.get('redirect')
     const goNext = () => navigate(redirect ? `/${redirect}` : '/', { replace: true })
     const [avatar, setAvatar] = useState(null) // { file, preview } if a photo was picked
+    const [pending, setPending] = useState(null) // { name, email, password } while waiting for the emailed code
 
     // Free the preview URL when it's replaced or the page closes.
     useEffect(() => () => releaseUpload(avatar), [avatar])
@@ -43,20 +45,46 @@ export default function Register() {
         setAvatar(toUpload(file))
     }
 
+    // Step 1: check the details and email a 6-digit code. No account is created yet.
     const onSubmit = async ({ name, email, password }) => {
         try {
-            // multipart/form-data: the photo goes to Multer on the API, then to Cloudinary.
-            const form = new FormData()
-            form.append('name', name)
-            form.append('email', email)
-            form.append('password', password)
-            if (avatar) form.append('avatar', avatar.file)
-            await dispatch(register(form))
-            toast.success('Your account is ready!')
-            goNext()
+            await dispatch(requestRegisterOtp({ name, email, password }))
+            setPending({ name, email, password })
+            toast.info('Check your email for the 6-digit code')
         } catch (err) {
             toast.error(getErrorMessage(err))
         }
+    }
+
+    // Step 2: the right code creates the account and logs you in.
+    const confirmCode = async (otp) => {
+        // multipart/form-data: the photo goes to Multer on the API, then to Cloudinary.
+        const form = new FormData()
+        form.append('name', pending.name)
+        form.append('email', pending.email)
+        form.append('password', pending.password)
+        form.append('otp', otp)
+        if (avatar) form.append('avatar', avatar.file)
+        await dispatch(register(form))
+        toast.success('Your account is ready!')
+        goNext()
+    }
+
+    if (pending) {
+        return (
+            <AuthCard title="Verify your email" subtitle="One last step to create your account.">
+                <MetaData title="Verify email" noIndex />
+                <OtpPanel
+                    email={pending.email}
+                    confirmLabel="Verify and create account"
+                    busyLabel="Creating account…"
+                    onConfirm={confirmCode}
+                    onResend={() => dispatch(requestRegisterOtp(pending))}
+                    onBack={() => setPending(null)}
+                    backLabel="Change my details"
+                />
+            </AuthCard>
+        )
     }
 
     return (
@@ -75,7 +103,7 @@ export default function Register() {
                 <FormField name="password" control={control} label="Password" type="password" autoComplete="new-password" helperText="At least 6 characters" />
                 <FormField name="confirmPassword" control={control} label="Confirm password" type="password" autoComplete="new-password" />
                 <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating account…' : 'Create account'}
+                    {isSubmitting ? 'Sending code…' : 'Create account'}
                 </Button>
             </Stack>
             <SocialLoginButtons onSuccess={goNext} />

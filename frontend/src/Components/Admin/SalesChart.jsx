@@ -11,7 +11,7 @@ import Skeleton from '@mui/material/Skeleton'
 import ShowChartRounded from '@mui/icons-material/ShowChartRounded'
 import BarChartRounded from '@mui/icons-material/BarChartRounded'
 import api, { getErrorMessage } from '../../api'
-import { formatMoney } from '../../Utils/helpers'
+import { formatMoney, formatMoneyShort } from '../../Utils/helpers'
 
 // "2026-10-15" in local time (what <input type="date"> uses)
 const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -61,7 +61,7 @@ export default function SalesChart() {
     const axes = [
         <CartesianGrid key="g" strokeDasharray="3 3" stroke="#e3e8f0" vertical={false} />,
         <XAxis key="x" dataKey="date" tickFormatter={shortDate} tick={{ fontSize: 12, fill: '#5b6b7f' }} minTickGap={24} />,
-        <YAxis key="y" tickFormatter={(v) => `$${v}`} tick={{ fontSize: 12, fill: '#5b6b7f' }} width={60} />,
+        <YAxis key="y" tickFormatter={formatMoneyShort} tick={{ fontSize: 12, fill: '#5b6b7f' }} width={64} />,
         <Tooltip key="t" {...tooltipProps} />
     ]
 

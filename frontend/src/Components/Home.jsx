@@ -17,6 +17,7 @@ import FilterPanel from './Product/FilterPanel'
 import EmptyState from './Common/EmptyState'
 import { fetchProducts, fetchProductsMeta, setFilters as setFiltersAction } from '../redux/actions/productActions'
 import { EMPTY_FILTERS } from '../redux/reducers/productReducer'
+import { formatMoney } from '../Utils/helpers'
 
 export default function Home() {
     const { keyword = '' } = useParams()
@@ -113,7 +114,7 @@ export default function Home() {
                         </Typography>
                         {keyword && <Chip size="small" label={`Search: ${keyword}`} onDelete={() => navigate('/')} />}
                         {filters.category && <Chip size="small" label={filters.category} onDelete={() => setFilters({ ...filters, category: '' })} />}
-                        {filters.price && <Chip size="small" label={`$${filters.price[0]} – $${filters.price[1]}`} onDelete={() => setFilters({ ...filters, price: null })} />}
+                        {filters.price && <Chip size="small" label={`${formatMoney(filters.price[0])} – ${formatMoney(filters.price[1])}`} onDelete={() => setFilters({ ...filters, price: null })} />}
                         {filters.ratings > 0 && <Chip size="small" label={`${filters.ratings}★ & up`} onDelete={() => setFilters({ ...filters, ratings: 0 })} />}
                     </Box>
 

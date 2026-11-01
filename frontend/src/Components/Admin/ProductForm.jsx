@@ -104,7 +104,7 @@ export default function ProductForm() {
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}><FormField name="seller" control={control} label="Seller" /></Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormField name="price" control={control} label="Price (USD)" type="number" slotProps={{ htmlInput: { min: 0, step: '0.01' } }} />
+                                    <FormField name="price" control={control} label="Price (PHP ₱)" type="number" slotProps={{ htmlInput: { min: 0, step: '0.01' } }} />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <FormField name="stock" control={control} label="Stock" type="number" slotProps={{ htmlInput: { min: 0, step: 1 } }} />

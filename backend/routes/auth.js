@@ -7,17 +7,20 @@ const a = require('../controllers/auth')
 const admin = [isAuthenticatedUser, authorizeRoles('admin')]
 
 // Account
-router.post('/register', uploadAvatar, a.registerUser)
-router.post('/login', a.loginUser)
+router.post('/register/otp', a.requestRegisterOtp)   // step 1: email a code
+router.post('/register', uploadAvatar, a.registerUser) // step 2: code + details create the account
+router.post('/login', a.loginUser)                     // step 1: password ok -> email a code
+router.post('/login/verify', a.verifyLogin)            // step 2: code logs you in
 router.get('/logout', a.logoutUser)
 router.post('/login/social', a.socialLogin)  // Google or Facebook (Firebase ID token)
 router.post('/login/google', a.socialLogin)  // kept for older clients
 router.post('/password/forgot', a.forgotPassword)
-router.put('/password/reset/:token', a.resetPassword)
+router.put('/password/reset', a.resetPassword)
 
 // Logged-in user
 router.get('/me', isAuthenticatedUser, a.getUserProfile)
 router.put('/me/update', isAuthenticatedUser, uploadAvatar, a.updateProfile)
+router.post('/otp/send', isAuthenticatedUser, a.sendActionOtp)
 router.put('/password/update', isAuthenticatedUser, a.updatePassword)
 
 // Admin

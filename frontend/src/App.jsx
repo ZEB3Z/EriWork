@@ -24,7 +24,6 @@ import Profile from './Components/User/Profile'
 import UpdateProfile from './Components/User/UpdateProfile'
 import UpdatePassword from './Components/User/UpdatePassword'
 import ForgotPassword from './Components/User/ForgotPassword'
-import NewPassword from './Components/User/NewPassword'
 
 import AdminLayout from './Components/Admin/AdminLayout'
 import Dashboard from './Components/Admin/Dashboard'
@@ -68,7 +67,8 @@ export default function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/password/forgot" element={<ForgotPassword />} />
-                    <Route path="/password/reset/:token" element={<NewPassword />} />
+                    {/* Old emailed reset links (before one-time codes) land on the forgot-password page */}
+                    <Route path="/password/reset/:token" element={<Navigate to="/password/forgot" replace />} />
                     <Route path="/me" element={signedIn(<Profile />)} />
                     <Route path="/me/update" element={signedIn(<UpdateProfile />)} />
                     <Route path="/password/update" element={signedIn(<UpdatePassword />)} />

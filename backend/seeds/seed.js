@@ -2,6 +2,7 @@
 //   npm run seed
 //
 // Needs MONGO_URI and the CLOUDINARY_* keys in backend/.env.
+// Prices are in Philippine pesos (PHP): the original USD prices x 60.
 // Creates (only if missing, so it's safe to run again):
 //   - an admin account          admin@eriwork.local    / admin1234
 //   - two demo customers        juan@eriwork.local     / customer1234
@@ -32,29 +33,29 @@ const img = async (name) => Promise.all(['a', 'b'].map((v) =>
     uploadPath(path.join(IMAGES_DIR, `${name}-${v}.svg`), `${name}-${v}`)))
 
 const PRODUCTS = [
-    { name: 'EriWork AX3000 Dual-Band WiFi 6 Router', price: 89.99, category: 'Routers', stock: 40, imageName: 'router',
+    { name: 'EriWork AX3000 Dual-Band WiFi 6 Router', price: 5399.4, category: 'Routers', stock: 40, imageName: 'router',
       description: 'Wi-Fi 6 router with speeds up to 3000 Mbps, four high-gain antennas, OFDMA and MU-MIMO for low-latency connections across many devices. Four Gigabit LAN ports and one Gigabit WAN port.' },
-    { name: 'EriWork AX5400 Tri-Band Gaming Router', price: 169.99, category: 'Routers', stock: 25, imageName: 'gaming-router',
+    { name: 'EriWork AX5400 Tri-Band Gaming Router', price: 10199.4, category: 'Routers', stock: 25, imageName: 'gaming-router',
       description: 'Tri-band Wi-Fi 6 gaming router with a 1.7 GHz quad-core CPU, a dedicated gaming port, traffic prioritisation and 2.5G WAN. Built for low ping under heavy load.' },
-    { name: 'EriWork Deco Mesh WiFi System (3-Pack)', price: 199.99, category: 'Mesh WiFi', stock: 30, imageName: 'mesh',
+    { name: 'EriWork Deco Mesh WiFi System (3-Pack)', price: 11999.4, category: 'Mesh WiFi', stock: 30, imageName: 'mesh',
       description: 'Whole-home mesh Wi-Fi covering up to 5,500 sq ft with seamless roaming on one network name. Self-healing mesh, parental controls and app setup in minutes.' },
-    { name: 'EriWork AC1200 WiFi Range Extender', price: 34.99, category: 'Range Extenders', stock: 60, imageName: 'extender',
+    { name: 'EriWork AC1200 WiFi Range Extender', price: 2099.4, category: 'Range Extenders', stock: 60, imageName: 'extender',
       description: 'Dual-band extender that boosts existing Wi-Fi coverage by up to 1,500 sq ft. One-touch setup, a signal indicator for the best placement and a Gigabit Ethernet port.' },
-    { name: 'EriWork Ceiling Mount WiFi 6 Access Point', price: 79.99, category: 'Access Points', stock: 35, imageName: 'access-point',
+    { name: 'EriWork Ceiling Mount WiFi 6 Access Point', price: 4799.4, category: 'Access Points', stock: 35, imageName: 'access-point',
       description: 'Business-grade Wi-Fi 6 access point with PoE power, seamless roaming and cloud management. Ideal for offices, cafes and classrooms.' },
-    { name: 'EriWork 8-Port Gigabit Desktop Switch', price: 24.99, category: 'Switches', stock: 80, imageName: 'switch-8',
+    { name: 'EriWork 8-Port Gigabit Desktop Switch', price: 1499.4, category: 'Switches', stock: 80, imageName: 'switch-8',
       description: 'Unmanaged 8-port Gigabit switch in a fanless metal case. Plug-and-play setup with auto-negotiation on every port.' },
-    { name: 'EriWork 16-Port Gigabit Smart Switch', price: 109.99, category: 'Switches', stock: 20, imageName: 'switch-16',
+    { name: 'EriWork 16-Port Gigabit Smart Switch', price: 6599.4, category: 'Switches', stock: 20, imageName: 'switch-16',
       description: 'Smart managed 16-port Gigabit switch with VLAN, QoS and link aggregation in a 1U rack-mount chassis. Web-managed for growing networks.' },
-    { name: 'EriWork USB 3.0 Gigabit Ethernet Adapter', price: 15.99, category: 'Network Adapters', stock: 100, imageName: 'usb-adapter',
+    { name: 'EriWork USB 3.0 Gigabit Ethernet Adapter', price: 959.4, category: 'Network Adapters', stock: 100, imageName: 'usb-adapter',
       description: 'Adds a Gigabit wired port to any laptop over USB 3.0. Plug-and-play on Windows, macOS and Linux.' },
-    { name: 'EriWork AV1000 Powerline Adapter Kit', price: 44.99, category: 'Powerline', stock: 45, imageName: 'powerline',
+    { name: 'EriWork AV1000 Powerline Adapter Kit', price: 2699.4, category: 'Powerline', stock: 45, imageName: 'powerline',
       description: 'Extends your network through existing electrical wiring at up to 1000 Mbps — no new cables needed. Plug-and-play pair with Gigabit ports.' },
-    { name: 'EriWork Cat6 Ethernet Cable 3m (5-Pack)', price: 12.99, category: 'Cables', stock: 150, imageName: 'cable-cat6',
+    { name: 'EriWork Cat6 Ethernet Cable 3m (5-Pack)', price: 779.4, category: 'Cables', stock: 150, imageName: 'cable-cat6',
       description: 'Cat6 patch cables rated for Gigabit speeds and 250 MHz bandwidth, with snagless boots and pure copper conductors. Pack of five.' },
-    { name: 'EriWork Cat7 Shielded Ethernet Cable 10m', price: 18.99, category: 'Cables', stock: 90, imageName: 'cable-cat7',
+    { name: 'EriWork Cat7 Shielded Ethernet Cable 10m', price: 1139.4, category: 'Cables', stock: 90, imageName: 'cable-cat7',
       description: 'Shielded S/FTP Cat7 cable supporting 10 Gbps for interference-free high-speed runs. Durable braided jacket and gold-plated connectors.' },
-    { name: 'EriWork 24-Port Cat6 Patch Panel', price: 29.99, category: 'Accessories', stock: 0, imageName: 'patch-panel',
+    { name: 'EriWork 24-Port Cat6 Patch Panel', price: 1799.4, category: 'Accessories', stock: 0, imageName: 'patch-panel',
       description: '24-port Cat6 patch panel for tidy structured cabling. Colour-coded T568A/B wiring and wall or rack mounting.' }
 ]
 

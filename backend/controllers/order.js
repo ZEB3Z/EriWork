@@ -4,8 +4,12 @@ const Product = require('../models/product')
 const User = require('../models/user')
 const { calculatePrices } = require('../utils/pricing')
 const { sendOrderEmail } = require('../utils/orderNotifications')
+const { verifyOtp } = require('../utils/otp')
+const generateReceiptPdf = require('../utils/receiptPdf')
+const { readReceiptToken } = require('../utils/receiptLink')
 
-// POST /order/new  { orderItems: [{ product, quantity }], shippingInfo }
+// POST /order/new  { orderItems: [{ product, quantity }], shippingInfo, otp }
+// The customer must enter the code emailed by POST /otp/send (purpose 'checkout').
 // Names, prices and totals are taken from the database, not from the browser.
 exports.newOrder = async (req, res) => {
     const { orderItems, shippingInfo } = req.body
@@ -33,7 +37,10 @@ exports.newOrder = async (req, res) => {
         })
     }
 
-    // 2. Create the order with server-calculated totals.
+    // 2. The emailed code confirms the purchase (checked after stock, so a stock problem doesn't burn the code).
+    await verifyOtp({ email: req.user.email, purpose: 'checkout', code: req.body.otp })
+
+    // 3. Create the order with server-calculated totals.
     const order = await Order.create({
         orderItems: items,
         shippingInfo,
@@ -43,12 +50,12 @@ exports.newOrder = async (req, res) => {
         user: req.user._id
     })
 
-    // 3. Reserve stock.
+    // 4. Reserve stock.
     for (const item of items) {
         await Product.updateOne({ _id: item.product }, { $inc: { stock: -item.quantity } })
     }
 
-    // 4. Email confirmation + PDF receipt (runs in the background, never fails the order).
+    // 5. Email confirmation + PDF receipt (runs in the background, never fails the order).
     sendOrderEmail(order, req.user, 'placed')
 
     res.status(201).json({ success: true, order })
@@ -70,6 +77,41 @@ exports.getSingleOrder = async (req, res) => {
         return res.status(403).json({ message: 'You cannot view this order' })
     }
     res.status(200).json({ success: true, order })
+}
+
+// Streams the PDF receipt of an order as a download.
+const sendReceipt = async (order, res) => {
+    const pdf = await generateReceiptPdf(order, order.user)
+    const name = `EriWork-Receipt-${String(order._id).slice(-8).toUpperCase()}.pdf`
+    res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${name}"`,
+        'Content-Length': pdf.length,
+        'Access-Control-Expose-Headers': 'Content-Disposition',
+        'Cache-Control': 'private, no-store'
+    })
+    res.status(200).end(pdf)
+}
+
+// GET /order/:id/receipt — PDF receipt for the order's owner or an admin
+exports.downloadReceipt = async (req, res) => {
+    const order = await Order.findById(req.params.id).populate('user', 'name email')
+    if (!order) return res.status(404).json({ message: 'Order not found' })
+
+    const isOwner = order.user && order.user._id.toString() === req.user._id.toString()
+    if (!isOwner && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'You cannot download this receipt' })
+    }
+    await sendReceipt(order, res)
+}
+
+// GET /receipt/:token — the "Download PDF" link inside emails (signed, expires, one order only)
+exports.downloadReceiptByToken = async (req, res) => {
+    const orderId = readReceiptToken(req.params.token)
+    if (!orderId) return res.status(401).json({ message: 'This download link is invalid or has expired. Log in and download the receipt from your order page.' })
+    const order = await Order.findById(orderId).populate('user', 'name email')
+    if (!order) return res.status(404).json({ message: 'Order not found' })
+    await sendReceipt(order, res)
 }
 
 // GET /admin/orders

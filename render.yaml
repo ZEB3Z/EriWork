@@ -39,6 +39,10 @@ services:
       - key: FRONTEND_URL
         sync: false
 
+      # This API's own public URL (used by the "Download PDF" button in emails)
+      - key: BACKEND_URL
+        sync: false                  # https://<api-service>.onrender.com
+
       # Image storage (Cloudinary)
       - key: CLOUDINARY_CLOUD_NAME
         sync: false

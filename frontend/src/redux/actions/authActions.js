@@ -27,12 +27,26 @@ export const loadUser = () => async (dispatch) => {
 
 // Each thunk resolves with the server's response or throws the axios error,
 // so forms can show their own toasts exactly as before.
-export const login = (credentials) => async (dispatch) => {
+// Login is two steps. Step 1 checks the password and the server emails a 6-digit code.
+// It does NOT log you in, so nothing is dispatched here.
+export const login = (credentials) => async () => {
     const { data } = await api.post('/login', credentials)
+    return data // { otpRequired: true, email, ... }
+}
+
+// Step 2: the emailed code logs you in.
+export const verifyLogin = (email, otp) => async (dispatch) => {
+    const { data } = await api.post('/login/verify', { email, otp })
     return dispatch(loggedIn(data))
 }
 
-// formData: name, email, password and an optional "avatar" file (multipart).
+// Sign-up step 1: validates the details and emails a code. No account exists yet.
+export const requestRegisterOtp = (values) => async () => {
+    const { data } = await api.post('/register/otp', values) // { name, email, password }
+    return data
+}
+
+// Sign-up step 2. formData: name, email, password, otp and an optional "avatar" file (multipart).
 export const register = (formData) => async (dispatch) => {
     const { data } = await api.post('/register', formData)
     return dispatch(loggedIn(data))
@@ -46,8 +60,9 @@ export const socialLogin = (provider) => async (dispatch) => {
     return dispatch(loggedIn(data))
 }
 
-export const resetPassword = (token, values) => async (dispatch) => {
-    const { data } = await api.put(`/password/reset/${token}`, values)
+// values: { email, otp, password, confirmPassword }
+export const resetPassword = (values) => async (dispatch) => {
+    const { data } = await api.put('/password/reset', values)
     return dispatch(loggedIn(data))
 }
 

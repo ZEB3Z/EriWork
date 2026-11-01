@@ -9,6 +9,8 @@ const admin = [isAuthenticatedUser, authorizeRoles('admin')]
 router.post('/order/new', isAuthenticatedUser, o.newOrder)
 router.get('/orders/me', isAuthenticatedUser, o.myOrders)
 router.get('/order/:id', isAuthenticatedUser, o.getSingleOrder)
+router.get('/order/:id/receipt', isAuthenticatedUser, o.downloadReceipt)
+router.get('/receipt/:token', o.downloadReceiptByToken) // public, signed link used in emails
 
 // Admin
 router.get('/admin/orders', admin, o.allOrders)
