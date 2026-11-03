@@ -53,14 +53,14 @@ export default function ProductsList() {
         const more = rows.length > 5 ? `<li>and ${rows.length - 5} more</li>` : ''
         const deleted = await confirmDelete({
             title: rows.length === 1 ? 'Delete product?' : 'Delete products?',
-            html: `This permanently deletes ${label} and ${rows.length === 1 ? 'its' : 'their'} photos:<ul>${names}${more}</ul>`,
+            html: `This moves ${label} to the Trash. You can restore ${rows.length === 1 ? 'it' : 'them'} later:<ul>${names}${more}</ul>`,
             confirmText: `Delete ${label}`,
             action: () => ids.length === 1
                 ? api.delete(`/admin/product/${ids[0]}`)
                 : api.post('/admin/products/bulk-delete', { ids })
         })
         if (deleted) {
-            toast.success(`Deleted ${label}`)
+            toast.success(`Moved ${label} to Trash`)
             setSelection(EMPTY_SELECTION)
             loadProducts()
         }

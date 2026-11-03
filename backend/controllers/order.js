@@ -20,7 +20,7 @@ exports.newOrder = async (req, res) => {
     // 1. Validate every item and check stock before changing anything.
     const items = []
     for (const item of orderItems) {
-        const product = await Product.findById(item.product)
+        const product = await Product.findOne({ _id: item.product, deletedAt: null })
         if (!product) {
             return res.status(404).json({ message: 'A product in your cart no longer exists' })
         }
@@ -63,13 +63,13 @@ exports.newOrder = async (req, res) => {
 
 // GET /orders/me
 exports.myOrders = async (req, res) => {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 })
+    const orders = await Order.find({ user: req.user._id, deletedAt: null }).sort({ createdAt: -1 })
     res.status(200).json({ success: true, orders })
 }
 
 // GET /order/:id — the owner or an admin can view it
 exports.getSingleOrder = async (req, res) => {
-    const order = await Order.findById(req.params.id).populate('user', 'name email')
+    const order = await Order.findOne({ _id: req.params.id, deletedAt: null }).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
     const isOwner = order.user && order.user._id.toString() === req.user._id.toString()
@@ -95,7 +95,7 @@ const sendReceipt = async (order, res) => {
 
 // GET /order/:id/receipt — PDF receipt for the order's owner or an admin
 exports.downloadReceipt = async (req, res) => {
-    const order = await Order.findById(req.params.id).populate('user', 'name email')
+    const order = await Order.findOne({ _id: req.params.id, deletedAt: null }).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
     const isOwner = order.user && order.user._id.toString() === req.user._id.toString()
@@ -109,14 +109,14 @@ exports.downloadReceipt = async (req, res) => {
 exports.downloadReceiptByToken = async (req, res) => {
     const orderId = readReceiptToken(req.params.token)
     if (!orderId) return res.status(401).json({ message: 'This download link is invalid or has expired. Log in and download the receipt from your order page.' })
-    const order = await Order.findById(orderId).populate('user', 'name email')
+    const order = await Order.findOne({ _id: orderId, deletedAt: null }).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
     await sendReceipt(order, res)
 }
 
 // GET /admin/orders
 exports.allOrders = async (req, res) => {
-    const orders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 })
+    const orders = await Order.find({ deletedAt: null }).populate('user', 'name email').sort({ createdAt: -1 })
     const totalAmount = orders
         .filter((o) => o.orderStatus !== 'Cancelled')
         .reduce((sum, o) => sum + o.totalPrice, 0)
@@ -130,7 +130,7 @@ exports.updateOrder = async (req, res) => {
         return res.status(400).json({ message: 'Invalid order status' })
     }
 
-    const order = await Order.findById(req.params.id).populate('user', 'name email')
+    const order = await Order.findOne({ _id: req.params.id, deletedAt: null }).populate('user', 'name email')
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
     if (order.orderStatus === 'Delivered' || order.orderStatus === 'Cancelled') {
@@ -165,9 +165,13 @@ exports.updateOrder = async (req, res) => {
 
 // DELETE /admin/order/:id
 exports.deleteOrder = async (req, res) => {
-    const order = await Order.findByIdAndDelete(req.params.id)
+    // Soft delete: the order goes to the Trash and can be restored from there.
+    const order = await Order.findOneAndUpdate(
+        { _id: req.params.id, deletedAt: null },
+        { deletedAt: new Date() }
+    )
     if (!order) return res.status(404).json({ message: 'Order not found' })
-    res.status(200).json({ success: true })
+    res.status(200).json({ success: true, message: 'Order moved to Trash' })
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +204,7 @@ exports.getSalesChart = async (req, res) => {
     }
 
     const orders = await Order.find({
+        deletedAt: null,
         paidAt: { $gte: start, $lte: end },
         orderStatus: { $ne: 'Cancelled' }
     }).select('paidAt totalPrice')
@@ -231,10 +236,10 @@ exports.getSalesChart = async (req, res) => {
 // GET /admin/stats — numbers for the dashboard cards
 exports.getDashboardStats = async (req, res) => {
     const [products, outOfStock, users, orders] = await Promise.all([
-        Product.countDocuments(),
-        Product.countDocuments({ stock: 0 }),
-        User.countDocuments(),
-        Order.find().select('totalPrice orderStatus')
+        Product.countDocuments({ deletedAt: null }),
+        Product.countDocuments({ deletedAt: null, stock: 0 }),
+        User.countDocuments({ deletedAt: null }),
+        Order.find({ deletedAt: null }).select('totalPrice orderStatus')
     ])
 
     const statusCounts = {}

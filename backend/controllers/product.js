@@ -49,7 +49,7 @@ exports.getProducts = async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1)
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 8))
 
-    const filter = {}
+    const filter = { deletedAt: null }
     if (keyword) filter.name = { $regex: escapeRegex(keyword), $options: 'i' }
     if (category) filter.category = category
     if (minPrice || maxPrice) {
@@ -77,8 +77,8 @@ exports.getProducts = async (req, res) => {
 
 // GET /products/meta — price bounds and categories for the filter panel
 exports.getProductsMeta = async (req, res) => {
-    const cheapest = await Product.findOne().sort({ price: 1 }).select('price')
-    const priciest = await Product.findOne().sort({ price: -1 }).select('price')
+    const cheapest = await Product.findOne({ deletedAt: null }).sort({ price: 1 }).select('price')
+    const priciest = await Product.findOne({ deletedAt: null }).sort({ price: -1 }).select('price')
     res.status(200).json({
         success: true,
         categories: CATEGORIES,
@@ -89,9 +89,12 @@ exports.getProductsMeta = async (req, res) => {
 
 // GET /product/:id
 exports.getSingleProduct = async (req, res) => {
-    const product = await Product.findById(req.params.id)
+    const product = await Product.findOne({ _id: req.params.id, deletedAt: null })
     if (!product) return res.status(404).json({ message: 'Product not found' })
-    res.status(200).json({ success: true, product })
+    // Deleted reviews stay hidden from shoppers.
+    const data = product.toObject()
+    data.reviews = data.reviews.filter((r) => !r.deletedAt)
+    res.status(200).json({ success: true, product: data })
 }
 
 // ---------------------------------------------------------------------------
@@ -107,11 +110,11 @@ const hasPurchased = (userId, productId) =>
 
 // GET /review/eligibility/:productId — can this user review, plus their existing review
 exports.getReviewEligibility = async (req, res) => {
-    const product = await Product.findById(req.params.productId)
+    const product = await Product.findOne({ _id: req.params.productId, deletedAt: null })
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
     const purchased = await hasPurchased(req.user._id, product._id)
-    const myReview = product.reviews.find((r) => r.user.toString() === req.user._id.toString())
+    const myReview = product.reviews.find((r) => !r.deletedAt && r.user.toString() === req.user._id.toString())
 
     res.status(200).json({ success: true, canReview: Boolean(purchased), review: myReview || null })
 }
@@ -130,7 +133,7 @@ exports.createProductReview = async (req, res) => {
     const error = validate(req.body, { productId: 'mongoId', comment: 'reviewComment' })
     if (error) return res.status(400).json({ message: error })
 
-    const product = await Product.findById(productId)
+    const product = await Product.findOne({ _id: productId, deletedAt: null })
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
     if (!(await hasPurchased(req.user._id, product._id))) {
@@ -138,7 +141,7 @@ exports.createProductReview = async (req, res) => {
     }
 
     const cleanComment = cleanText(String(comment).trim())
-    const existing = product.reviews.find((r) => r.user.toString() === req.user._id.toString())
+    const existing = product.reviews.find((r) => !r.deletedAt && r.user.toString() === req.user._id.toString())
 
     if (existing) {
         existing.rating = rating
@@ -168,7 +171,7 @@ exports.createProductReview = async (req, res) => {
 
 // GET /admin/products
 exports.getAdminProducts = async (req, res) => {
-    const products = await Product.find().select('-reviews').sort({ createdAt: -1 })
+    const products = await Product.find({ deletedAt: null }).select('-reviews').sort({ createdAt: -1 })
     res.status(200).json({ success: true, products })
 }
 
@@ -197,7 +200,7 @@ exports.newProduct = async (req, res) => {
 
 // PUT /admin/product/:id  multipart: { ...fields, keepImages: '[public_id, ...]', images: [files] }
 exports.updateProduct = async (req, res) => {
-    const product = await Product.findById(req.params.id)
+    const product = await Product.findOne({ _id: req.params.id, deletedAt: null })
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
     const error = validate(req.body, PRODUCT_RULES)
@@ -229,12 +232,15 @@ exports.updateProduct = async (req, res) => {
 }
 
 // DELETE /admin/product/:id
+// Moves the product to the Trash (kept in the database, photos kept in Cloudinary).
+// Admin → Trash can restore it or delete it forever.
 exports.deleteProduct = async (req, res) => {
-    const product = await Product.findByIdAndDelete(req.params.id)
+    const product = await Product.findOneAndUpdate(
+        { _id: req.params.id, deletedAt: null },
+        { deletedAt: new Date() }
+    )
     if (!product) return res.status(404).json({ message: 'Product not found' })
-
-    await destroyImages(product.images)
-    res.status(200).json({ success: true, message: 'Product deleted' })
+    res.status(200).json({ success: true, message: 'Product moved to Trash' })
 }
 
 // POST /admin/products/bulk-delete  { ids: [...] }
@@ -248,19 +254,21 @@ exports.bulkDeleteProducts = async (req, res) => {
         return res.status(400).json({ message: 'Invalid product id in selection' })
     }
 
-    const products = await Product.find({ _id: { $in: ids } })
-    await Product.deleteMany({ _id: { $in: ids } })
-    await Promise.all(products.map((p) => destroyImages(p.images)))
+    // Soft delete: the products go to the Trash and can be restored from there.
+    const result = await Product.updateMany(
+        { _id: { $in: ids }, deletedAt: null },
+        { deletedAt: new Date() }
+    )
 
-    res.status(200).json({ success: true, deletedCount: products.length })
+    res.status(200).json({ success: true, deletedCount: result.modifiedCount })
 }
 
 // GET /admin/reviews — every review across all products (for the admin table)
 exports.getAllReviews = async (req, res) => {
-    const products = await Product.find({ numOfReviews: { $gt: 0 } }).select('name reviews')
+    const products = await Product.find({ deletedAt: null, numOfReviews: { $gt: 0 } }).select('name reviews')
     const reviews = []
     products.forEach((p) => {
-        p.reviews.forEach((r) => {
+        p.reviews.filter((r) => !r.deletedAt).forEach((r) => {
             reviews.push({
                 _id: r._id,
                 productId: p._id,
@@ -278,16 +286,15 @@ exports.getAllReviews = async (req, res) => {
 
 // DELETE /admin/reviews?productId=...&id=...
 exports.deleteReview = async (req, res) => {
-    const product = await Product.findById(req.query.productId)
+    const product = await Product.findOne({ _id: req.query.productId, deletedAt: null })
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
-    const before = product.reviews.length
-    product.reviews = product.reviews.filter((r) => r._id.toString() !== String(req.query.id))
-    if (product.reviews.length === before) {
-        return res.status(404).json({ message: 'Review not found' })
-    }
+    // Soft delete: the review is hidden and the rating recalculated, but it can be restored from Trash.
+    const review = product.reviews.find((r) => r._id.toString() === String(req.query.id) && !r.deletedAt)
+    if (!review) return res.status(404).json({ message: 'Review not found' })
 
+    review.deletedAt = new Date()
     product.updateRatings()
     await product.save({ validateBeforeSave: false })
-    res.status(200).json({ success: true, message: 'Review deleted' })
+    res.status(200).json({ success: true, message: 'Review moved to Trash' })
 }

@@ -50,11 +50,11 @@ export default function ProductReviews() {
     const askDelete = async (review) => {
         const deleted = await confirmDelete({
             title: 'Delete review?',
-            text: `Remove ${review.name}'s ${review.rating}-star review of "${review.productName}"? The product rating will be recalculated.`,
+            text: `Remove ${review.name}'s ${review.rating}-star review of "${review.productName}"? The product rating will be recalculated, and you can restore it from Trash.`,
             action: () => api.delete('/admin/reviews', { params: { productId: review.productId, id: review._id } })
         })
         if (deleted) {
-            toast.success('Review deleted')
+            toast.success('Review moved to Trash')
             loadReviews()
         }
     }

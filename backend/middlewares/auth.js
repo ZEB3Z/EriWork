@@ -32,6 +32,10 @@ exports.isAuthenticatedUser = async (req, res, next) => {
         return res.status(401).json({ message: 'Your account was not found. Please log out and log in again.' })
     }
 
+    if (user.deletedAt) {
+        return res.status(401).json({ message: 'This account has been deleted. Please contact support.' })
+    }
+
     req.user = user
     next()
 }

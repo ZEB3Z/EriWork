@@ -41,7 +41,7 @@ exports.requestRegisterOtp = async (req, res) => {
     if (error) return res.status(400).json({ message: error })
 
     const email = normalizeEmail(req.body.email)
-    if (await User.findOne({ email })) {
+    if (await User.findOne({ email })) { // includes deleted accounts: their email stays reserved until restored or removed for good
         return res.status(400).json({ message: 'An account with this email already exists' })
     }
     const info = await issueOtp({ email, purpose: 'register', name: req.body.name.trim() })
@@ -86,6 +86,9 @@ exports.loginUser = async (req, res) => {
     if (!user || !(await user.comparePassword(String(password)))) {
         return res.status(401).json({ message: 'Invalid email or password' })
     }
+    if (user.deletedAt) {
+        return res.status(403).json({ message: 'This account has been deleted. Please contact support.' })
+    }
     const info = await issueOtp({ email, purpose: 'login', name: user.name })
     res.status(200).json({ success: true, otpRequired: true, email, message: `We sent a 6-digit code to ${email}`, ...info })
 }
@@ -99,7 +102,7 @@ exports.verifyLogin = async (req, res) => {
     const email = normalizeEmail(req.body.email)
     await verifyOtp({ email, purpose: 'login', code: req.body.otp })
 
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email, deletedAt: null })
     if (!user) return res.status(401).json({ message: 'Account not found' })
     sendToken(user, 200, res)
 }
@@ -151,6 +154,9 @@ exports.socialLogin = async (req, res) => {
     // Log in the existing account, or create one the first time.
     const email = normalizeEmail(decoded.email)
     let user = await User.findOne({ email })
+    if (user && user.deletedAt) {
+        return res.status(403).json({ message: 'This account has been deleted. Please contact support.' })
+    }
     if (!user) {
         user = await User.create({
             name: (decoded.name || email.split('@')[0]).slice(0, 30),
@@ -171,7 +177,7 @@ exports.forgotPassword = async (req, res) => {
     if (error) return res.status(400).json({ message: error })
 
     const email = normalizeEmail(req.body.email)
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email, deletedAt: null })
     if (!user) {
         return res.status(404).json({ message: 'No account found with this email' })
     }
@@ -188,7 +194,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     const email = normalizeEmail(req.body.email)
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email, deletedAt: null })
     if (!user) return res.status(400).json({ message: 'This code is invalid or has expired' })
     await verifyOtp({ email, purpose: 'reset', code: req.body.otp })
 
@@ -259,13 +265,13 @@ exports.updatePassword = async (req, res) => {
 
 // GET /admin/users
 exports.allUsers = async (req, res) => {
-    const users = await User.find().sort({ createdAt: -1 })
+    const users = await User.find({ deletedAt: null }).sort({ createdAt: -1 })
     res.status(200).json({ success: true, users })
 }
 
 // GET /admin/user/:id
 exports.getUserDetails = async (req, res) => {
-    const user = await User.findById(req.params.id)
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null })
     if (!user) return res.status(404).json({ message: 'User not found' })
     res.status(200).json({ success: true, user })
 }
@@ -283,7 +289,7 @@ exports.updateUser = async (req, res) => {
     const error = validate(req.body, { name: 'name', email: 'email' }, ['name', 'email'])
     if (error) return res.status(400).json({ message: error })
 
-    const user = await User.findById(req.params.id)
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null })
     if (!user) return res.status(404).json({ message: 'User not found' })
 
     if (email && normalizeEmail(email) !== user.email) {
@@ -304,10 +310,11 @@ exports.deleteUser = async (req, res) => {
     if (req.params.id === req.user._id.toString()) {
         return res.status(400).json({ message: "You can't delete your own account" })
     }
-    const user = await User.findById(req.params.id)
+    // Soft delete: the account is blocked from logging in but kept, so Admin → Trash can restore it.
+    const user = await User.findOneAndUpdate(
+        { _id: req.params.id, deletedAt: null },
+        { deletedAt: new Date() }
+    )
     if (!user) return res.status(404).json({ message: 'User not found' })
-
-    await user.deleteOne()
-    await destroyImage(user.avatar && user.avatar.public_id)
-    res.status(200).json({ success: true })
+    res.status(200).json({ success: true, message: 'User moved to Trash' })
 }

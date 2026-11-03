@@ -42,11 +42,11 @@ export default function OrdersList() {
     const askDelete = async (order) => {
         const deleted = await confirmDelete({
             title: 'Delete order?',
-            text: `Order ${shortId(order._id)} will be removed permanently.`,
+            text: `Order ${shortId(order._id)} will be moved to the Trash. You can restore it later.`,
             action: () => api.delete(`/admin/order/${order._id}`)
         })
         if (deleted) {
-            toast.success('Order deleted')
+            toast.success('Order moved to Trash')
             loadOrders()
         }
     }

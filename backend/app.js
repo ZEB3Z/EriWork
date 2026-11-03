@@ -6,6 +6,7 @@ const multer = require('multer')
 const products = require('./routes/product')
 const auth = require('./routes/auth')
 const order = require('./routes/order')
+const trash = require('./routes/trash')
 
 const app = express()
 
@@ -39,6 +40,7 @@ app.get('/api/v1/health', (req, res) => res.status(200).json({ status: 'ok' }))
 app.use('/api/v1', products)
 app.use('/api/v1', auth)
 app.use('/api/v1', order)
+app.use('/api/v1', trash)
 
 // Unknown API route
 app.use('/api/v1', (req, res) => {

@@ -12,13 +12,15 @@ import Inventory2Outlined from '@mui/icons-material/Inventory2Outlined'
 import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined'
 import PeopleOutlined from '@mui/icons-material/PeopleOutlined'
 import RateReviewOutlined from '@mui/icons-material/RateReviewOutlined'
+import RestoreFromTrashOutlined from '@mui/icons-material/RestoreFromTrashOutlined'
 
 const LINKS = [
     { to: '/admin', label: 'Dashboard', icon: <DashboardOutlined />, exact: true },
     { to: '/admin/products', label: 'Products', icon: <Inventory2Outlined />, match: '/admin/product' },
     { to: '/admin/orders', label: 'Orders', icon: <ReceiptLongOutlined />, match: '/admin/order' },
     { to: '/admin/users', label: 'Users', icon: <PeopleOutlined />, match: '/admin/user' },
-    { to: '/admin/reviews', label: 'Reviews', icon: <RateReviewOutlined />, match: '/admin/reviews' }
+    { to: '/admin/reviews', label: 'Reviews', icon: <RateReviewOutlined />, match: '/admin/reviews' },
+    { to: '/admin/trash', label: 'Trash', icon: <RestoreFromTrashOutlined />, match: '/admin/trash' }
 ]
 
 // Sidebar + page area for every admin page.

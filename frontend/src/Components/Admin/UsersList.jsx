@@ -39,11 +39,11 @@ export default function UsersList() {
     const askDelete = async (user) => {
         const deleted = await confirmDelete({
             title: 'Delete user?',
-            text: `${user.name} (${user.email}) will lose access permanently.`,
+            text: `${user.name} (${user.email}) will lose access. You can restore them from Trash.`,
             action: () => api.delete(`/admin/user/${user._id}`)
         })
         if (deleted) {
-            toast.success(`${user.name} was deleted`)
+            toast.success(`${user.name} was moved to Trash`)
             loadUsers()
         }
     }

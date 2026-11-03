@@ -17,7 +17,8 @@ const reviewSchema = new mongoose.Schema({
     name: { type: String, required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null } // set when an admin deletes it; cleared by Restore
 })
 
 const productSchema = new mongoose.Schema({
@@ -61,14 +62,16 @@ const productSchema = new mongoose.Schema({
     numOfReviews: { type: Number, default: 0 },
     reviews: [reviewSchema],
     user: { type: mongoose.Schema.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null } // set when an admin deletes it; cleared by Restore
 })
 
 // Recalculate the average rating and review count from the reviews array.
 productSchema.methods.updateRatings = function () {
-    this.numOfReviews = this.reviews.length
-    this.ratings = this.reviews.length
-        ? this.reviews.reduce((sum, r) => sum + r.rating, 0) / this.reviews.length
+    const active = this.reviews.filter((r) => !r.deletedAt) // deleted reviews don't count
+    this.numOfReviews = active.length
+    this.ratings = active.length
+        ? active.reduce((sum, r) => sum + r.rating, 0) / active.length
         : 0
 }
 

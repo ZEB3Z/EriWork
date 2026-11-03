@@ -34,6 +34,7 @@ import ProcessOrder from './Components/Admin/ProcessOrder'
 import UsersList from './Components/Admin/UsersList'
 import UpdateUser from './Components/Admin/UpdateUser'
 import ProductReviews from './Components/Admin/ProductReviews'
+import Trash from './Components/Admin/Trash'
 
 // Auth, cart and the product list live in the Redux store (src/redux).
 export default function App() {
@@ -84,6 +85,7 @@ export default function App() {
                         <Route path="users" element={<UsersList />} />
                         <Route path="user/:id" element={<UpdateUser />} />
                         <Route path="reviews" element={<ProductReviews />} />
+                        <Route path="trash" element={<Trash />} />
                     </Route>
                     <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

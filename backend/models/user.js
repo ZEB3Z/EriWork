@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    deletedAt: {
+        type: Date,
+        default: null // set when an admin deletes the account; cleared by Restore
+    },
     resetPasswordToken: String,
     resetPasswordExpire: Date
 })

@@ -35,7 +35,8 @@ const orderSchema = new mongoose.Schema({
         default: 'Processing'
     },
     deliveredAt: { type: Date },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null } // set when an admin deletes it; cleared by Restore
 })
 
 module.exports = mongoose.model('Order', orderSchema)
